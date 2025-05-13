@@ -82,41 +82,105 @@
 !
 !======================================================================!
 !
-       subroutine split_line(n,line,str)
+       subroutine split_line(n,inline,str)
+!
+       use printings,  only:  print_end
 !
        implicit none
 !
 ! Input/output variables
 !
-       character(len=10),dimension(n),intent(out)  ::  str   !  
-       character(len=lenline),intent(out)          ::  line  !  Line read
-       integer,intent(in)                          ::  n     !
+       character(len=10),dimension(n),intent(out)  ::  str     !  
+       character(len=lenline),intent(in)           ::  inline  !  Line read
+       integer,intent(in)                          ::  n       !
 !
 ! Local variables
 !
-       integer                                     ::  io    !  Scan status
-       integer                                     ::  i     !  Index
+       character(len=lenline)                      ::  line    !  Line read
+       integer                                     ::  io      !  Scan status
+       integer                                     ::  i       !  Index
 !
 ! Splitting input line into strings
 !
+       line = inline
+!
+       line = adjustl(line)
        io = scan(line,' ')
 !
        i = 0
        do while ( io .ne. 0 )
 !
-         i = i +1 
-         str(i)  = line(:io-1)
+         i = i + 1  
+!
+         if ( i .le. n ) then
+           str(i)  = line(:io-1)
+         end if
+!
+         line = line(io+1:)  
+         line = adjustl(line)
+         if ( len_trim(line) .eq. 0 ) exit
+!
+         io = scan(line,' ')
+!
+       end do
+!
+       if ( i .gt. n ) then
+         write(*,*)
+         write(*,'(2X,68("="))')
+         write(*,'(3X,A)')    'ERROR:  Line size larger than expected'
+         write(*,*)
+         write(*,'(3X,A)')    'Error while splitting line'
+         write(*,'(3X,A,I3)') 'Maximum number of strings :',n
+         write(*,'(3X,A,I3)') 'Number of actual strings  :',i
+         write(*,*)
+         write(*,'(2X,68("="))')
+         write(*,*)  
+         call print_end()
+       end if
+!
+       return
+       end subroutine split_line
+!
+!======================================================================!
+!
+       subroutine count_line(inline,n)
+!
+       use printings,  only:  print_end
+!
+       implicit none
+!
+! Input/output variables
+!
+       character(len=lenline),intent(in)  ::  inline  !  Line read
+       integer,intent(out)                ::  n       !
+!
+! Local variables
+!
+       character(len=lenline)             ::  line    !  Line read
+       integer                            ::  io      !  Scan status
+!
+! Splitting input line into strings
+! 
+       line = inline
+!
+       line = adjustl(line)
+       io = scan(line,' ')
+!
+       n = 0
+       do while ( io .ne. 0 )
+!
+         n = n + 1  
 !         
          line = line(io+1:)  
          line = adjustl(line)
-          if ( len_trim(line) .eq. 0 ) return
+         if ( len_trim(line) .eq. 0 ) return
 !
          io = scan(line,' ')
 !
        end do
 !
        return
-       end subroutine split_line
+       end subroutine count_line
 !
 !======================================================================!
 !

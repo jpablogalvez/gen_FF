@@ -27,25 +27,26 @@
 !
        subroutine read_top(top,itype,intop,unitop)
 !
-       use datatypes, only: grotop
+       use datatypes,  only:  grotop
 !
-       use utils,     only: findcv
-       use printings, only: print_missinp,print_end
+       use utils,      only:  findcv
+       use printings,  only:  print_missinp,print_end
 !
        implicit none
 !
 ! Input/output variables
 !
-       type(grotop),intent(out)                           ::  top     !
-       character(len=leninp),intent(in)                   ::  intop   !
-       integer,intent(in)                                 ::  unitop  !
-       integer,dimension(:),allocatable,intent(out)       ::  itype   !
+       type(grotop),intent(out)                      ::  top     !
+       character(len=leninp),intent(in)              ::  intop   !
+       integer,intent(in)                            ::  unitop  !
+       integer,dimension(:),allocatable,intent(out)  ::  itype   !
 !
 ! Local variables
 !
-       character(len=lenline)                            ::  line     !  Line read
-       integer                                           ::  io       !
-       integer                                           ::  i        !
+       character(len=lenline)                        ::  line    !  Line read
+       integer                                       ::  nstr    !
+       integer                                       ::  io      !
+       integer                                       ::  i       !
 !
 ! Reading Gromacs topology information
 ! ------------------------------------
@@ -66,6 +67,7 @@
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
          if ( line(1:1) .eq. '[' ) exit
          top%nat = top%nat + 1
        end do
@@ -74,7 +76,7 @@
 !
 ! Allocating atom types information
 !
-       allocate(top%attype%attype(top%nat),top%attype%bond(top%nat),   &
+       allocate(top%attype%atname(top%nat),top%attype%bond(top%nat),   &
                 top%attype%ptype(top%nat),top%attype%atnum(top%nat),   &
                 top%attype%mass(top%nat),top%attype%charge(top%nat),   &
                 top%attype%sig(top%nat),top%attype%eps(top%nat))
@@ -89,9 +91,9 @@
 !
        allocate(itype(top%nat))     
 !
-!
        top%atom%attype(:)   = ''
-       top%attype%attype(:) = ''
+!
+       top%attype%atname(:) = ''
        top%attype%bond(:)   = ''
        top%attype%ptype(:)  = '' 
 !
@@ -105,7 +107,7 @@
          if ( io /= 0 ) exit
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
-         if ( line(1:1) .ne. ';' ) exit
+         if ( (line(1:1).ne.';') .and. (line(1:1).ne.'#') ) exit ! Find first no blank line with no comments
        end do
 !
        read(line,*) top%def%nbfunc,top%def%comrule,top%def%genpair,    &
@@ -123,20 +125,56 @@
 !
          read(unitop,'(A)',iostat=io) line
          if ( io /= 0 ) exit
+!
+         io = scan(line,';')
+         if ( io .ne. 0 ) then
+           line = line(:io-1)
+           line = adjustl(line)
+         end if
+!
+         io = scan(line,'#')
+         if ( io .ne. 0 ) then
+           line = line(:io-1)
+           line = adjustl(line)
+         end if
+!
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
          if ( line(1:1) .eq. '[' ) exit
 !
          top%attype%ntype = top%attype%ntype + 1
 !
-         read(line,*) top%attype%attype(top%attype%ntype),             &
-                      top%attype%bond(top%attype%ntype),               & ! TODO: breaks with different format
-                      top%attype%mass(top%attype%ntype),               &
-                      top%attype%charge(top%attype%ntype),             &
-                      top%attype%ptype(top%attype%ntype),              &
-                      top%attype%sig(top%attype%ntype),                &
-                      top%attype%eps(top%attype%ntype) 
+         call count_line(line,nstr)
+!
+         if ( nstr .eq. 6 ) then
+           read(line,*) top%attype%atname(top%attype%ntype),             &
+                        top%attype%mass(top%attype%ntype),               &
+                        top%attype%charge(top%attype%ntype),             &
+                        top%attype%ptype(top%attype%ntype),              &
+                        top%attype%sig(top%attype%ntype),                &
+                        top%attype%eps(top%attype%ntype) 
+         else if ( nstr .eq. 7 ) then
+           read(line,*) top%attype%atname(top%attype%ntype),             &
+                        top%attype%bond(top%attype%ntype),               & 
+                        top%attype%mass(top%attype%ntype),               &
+                        top%attype%charge(top%attype%ntype),             &
+                        top%attype%ptype(top%attype%ntype),              &
+                        top%attype%sig(top%attype%ntype),                &
+                        top%attype%eps(top%attype%ntype) 
+         else
+           write(*,'(2X,68("="))')
+           write(*,'(3X,A)') 'ERROR:  Invalid format in [ atomtype'//  &
+                                          's ] section of topology file'
+           write(*,*)
+           write(*,'(3X,A)') 'Topology file  : '//trim(intop)
+           write(*,'(3X,A)') 'Invalid line   : '//trim(line)
+           write(*,*)
+           write(*,'(2X,68("="))')
+           write(*,*)
+           call print_end()
+         end if
 !
        end do
 !
@@ -152,7 +190,7 @@
          if ( io /= 0 ) exit
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
-         if ( line(1:1) .ne. ';' ) exit
+         if ( (line(1:1).ne.';') .and. (line(1:1).ne.'#') ) exit ! Find first no blank line with no comments
        end do
 !
        read(line,*) top%mol%resname,top%mol%nrexcl
@@ -177,6 +215,7 @@
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
 !
          i = i + 1
 !
@@ -186,7 +225,7 @@
                       top%atom%charge(i),top%atom%mass(i) ! TODO: read top mass or use qc output mass
 !
          io = findcv(top%attype%ntype,                                 &
-                     top%attype%attype(:top%attype%ntype),             &
+                     top%attype%atname(:top%attype%ntype),             &
                      top%atom%attype(i))
 !
          if ( io .le. 0 ) then
@@ -216,23 +255,23 @@
 !
        subroutine read_bond(bonded,intop,unitop)
 !
-       use datatypes, only: grobonded
+       use datatypes,  only:  grobonded
 !
-       use printings, only: print_missinp
+       use printings,  only:  print_missinp
 !
        implicit none
 !
 ! Input/output variables
 !
-       type(grobonded),intent(inout)                      ::  bonded  !
-       character(len=leninp),intent(in)                   ::  intop   !
-       integer,intent(in)                                 ::  unitop  !
+       type(grobonded),intent(inout)     ::  bonded  !
+       character(len=leninp),intent(in)  ::  intop   !
+       integer,intent(in)                ::  unitop  !
 !
 ! Local variables
 !
-       character(len=lenline)                            ::  line     !  Line read
-       integer                                           ::  io       !
-       integer                                           ::  i        !
+       character(len=lenline)            ::  line    !  Line read
+       integer                           ::  io      !
+       integer                           ::  i       !
 !
 ! Reading Gromacs bonds information
 ! ---------------------------------
@@ -253,6 +292,7 @@
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
          if ( line(1:1) .eq. '[' ) exit
          bonded%nbond = bonded%nbond + 1
        end do
@@ -277,6 +317,7 @@
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
 !
          i = i + 1
 !
@@ -294,23 +335,23 @@
 !
        subroutine read_angle(bonded,intop,unitop)
 !
-       use datatypes, only: grobonded
+       use datatypes,  only:  grobonded
 !
-       use printings, only: print_missinp
+       use printings,  only:  print_missinp
 !
        implicit none
 !
 ! Input/output variables
 !
-       type(grobonded),intent(inout)                      ::  bonded  !
-       character(len=leninp),intent(in)                   ::  intop   !
-       integer,intent(in)                                 ::  unitop  !
+       type(grobonded),intent(inout)     ::  bonded  !
+       character(len=leninp),intent(in)  ::  intop   !
+       integer,intent(in)                ::  unitop  !
 !
 ! Local variables
 !
-       character(len=lenline)                            ::  line     !  Line read
-       integer                                           ::  io       !
-       integer                                           ::  i        !
+       character(len=lenline)            ::  line    !  Line read
+       integer                           ::  io      !
+       integer                           ::  i       !
 !
 ! Reading Gromacs angles information
 ! ----------------------------------
@@ -322,7 +363,17 @@
 ! Counting the number of angles in the molecule
 !
        call find_key(unitop,'[ angles ]',line,io)
-       if ( io .ne. 0 ) call print_badread(intop,'[ angles ]')
+       if ( io .ne. 0 ) then
+         write(*,*)
+         write(*,'(2X,68("*"))')
+         write(*,'(3X,A)') 'NOTE:  [ angles ] section not found in'//  & ! TODO: check if nat = 2
+                                                        ' topology file'
+         write(*,*)
+         write(*,'(2X,68("*"))')
+         write(*,*)  
+         close(unitop)
+         return
+       end if
 !
        bonded%nang = 0
        do
@@ -331,6 +382,7 @@
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
          if ( line(1:1) .eq. '[' ) exit
          bonded%nang = bonded%nang + 1
        end do
@@ -339,10 +391,8 @@
 !
 ! Allocating angles information
 !
-       allocate(bonded%ang(bonded%nang),                               &
-                bonded%kang(bonded%nang),                              &
-                bonded%fang(bonded%nang),                              &
-                bonded%iang(3,bonded%nang))
+       allocate(bonded%ang(bonded%nang),bonded%kang(bonded%nang),      &
+                bonded%fang(bonded%nang),bonded%iang(3,bonded%nang))
 !
 ! Reading angles section  ! TODO: only valid for harmonic bond angle interactions
 ! 
@@ -350,17 +400,18 @@
        if ( io .ne. 0 ) call print_badread(intop,'[ angles ]')
 !
        i = 0
-       do while ( i .lt. bonded%nbond )
+       do while ( i .lt. bonded%nang )
 !
          read(unitop,'(A)',iostat=io) line
          if ( io /= 0 ) exit
          if ( len_trim(line) .eq. 0 ) cycle
          line = adjustl(line)
          if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
 !
          i = i + 1
 !
-         read(line,*) bonded%iang(:,i),bonded%fang(i),             & 
+         read(line,*) bonded%iang(:,i),bonded%fang(i),                 & 
                       bonded%ang(i),bonded%kang(i)
 !
        end do
@@ -439,8 +490,8 @@
 !
 ! Allocating dihedrals information
 !
-       allocate(bonded%dihe(bonded%ndihe),bonded%kdihe(bonded%ndihe),  &
-                bonded%fdihe(bonded%ndihe),bonded%multi(bonded%ndihe), &
+       allocate(bonded%dihe(bonded%ndihe),bonded%fdihe(bonded%ndihe),  &
+                bonded%kdihe(bonded%ndihe),bonded%multi(bonded%ndihe), &
                 bonded%idihe(4,bonded%ndihe))
 !
        allocate(bonded%c0(bonded%ndihe),bonded%c1(bonded%ndihe),       &
@@ -519,7 +570,7 @@
            read(str(8),*)  bonded%c3(i)
            read(str(9),*)  bonded%c4(i)
            read(str(10),*) bonded%c5(i)
-         else if ( bonded%fdihe(i) .eq. 9 ) then   !  Proper dihedral
+         else if ( bonded%fdihe(i) .eq. 9 ) then   !  Multiple proper dihedral
            read(str(6),*) bonded%dihe(i)
            read(str(7),*) bonded%kdihe(i)
            read(str(8),*) bonded%multi(i)
@@ -575,9 +626,9 @@
 !
 ! Printing bonded terms
 !
-      call print_bond(uni,topout,top%bonded)
-      if ( top%bonded%nang .gt. 1 ) call print_angle(uni,topout,top%bonded)
-      if ( dihe%ndihe .gt. 1 ) call print_dihe(uni,topout,dihe)
+       call print_bond(uni,topout,top%bonded)
+       if ( top%bonded%nang .gt. 1 ) call print_angle(uni,topout,top%bonded)
+       if ( dihe%ndihe .gt. 1 ) call print_dihe(uni,topout,dihe)
 !
 ! Printing pairs section
 !
@@ -622,9 +673,9 @@
 !
        do i = 1, bonded%nbond
          if ( bonded%fbond(i) .eq. 1 ) then
-           write(uni,'(2X,3(1X,I3),2(3X,F6.4),12X,A,2X,I4)')           &
+           write(uni,'(2X,3(1X,I3),2(3X,F12.4),12X,A,2X,I4)')           &
                       bonded%ibond(:,i),bonded%fbond(i),               & 
-                      bonded%bond(i),bonded%kbond(i),';',bonded%sbond(i)
+                      bonded%bond(i),bonded%kbond(i)!,';',bonded%sbond(i)
          else if ( bonded%fbond(i) .eq. 5 ) then
            write(uni,'(2X,3(1X,I3))') bonded%ibond(:,i),bonded%fbond(i)
          end if
@@ -661,7 +712,7 @@
        do i = 1, bonded%nang    
          write(uni,'(2X,4(1X,I3),2(3X,F9.4),5X,A,2X,I4)')              &
                          bonded%iang(:,i),bonded%fang(i),              &
-                         bonded%ang(i),bonded%kang(i),';',bonded%sang(i)
+                         bonded%ang(i),bonded%kang(i)!,';',bonded%sang(i)
        end do
        write(uni,*)
 !
@@ -696,7 +747,7 @@
          do i = 1, dihe%nimpro    
             write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4)')           &
                 dihe%iimpro(:,i),dihe%fimpro(i),dihe%dimpro(i),        &
-                                       dihe%kimpro(i),';',dihe%simpro(i)
+                                       dihe%kimpro(i)!,';',dihe%simpro(i)
          end do
        end if
 !
@@ -704,7 +755,7 @@
          do i = 1, dihe%ninv    
             write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4)')           &
                       dihe%iinv(:,i),dihe%finv(i),dihe%dinv(i),        &
-                                           dihe%kinv(i),';',dihe%sinv(i)
+                                           dihe%kinv(i)!,';',dihe%sinv(i)
          end do
        end if
 !
@@ -712,7 +763,7 @@
          do i = 1, dihe%nrigid    
             write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4)')           &
                       dihe%irigid(:,i),dihe%frigid(i),dihe%drigid(i),  &
-                                       dihe%krigid(i),';',dihe%srigid(i)
+                                       dihe%krigid(i)!,';',dihe%srigid(i)
          end do
        end if
 !
@@ -722,7 +773,7 @@
               write(uni,'(2X,5(1X,I3),2(1X,F9.4),1X,I4,5X,A,2X,I4)')   &
                 dihe%flexi(i)%itor(:),dihe%fflexi(i),                  &
                 dihe%flexi(i)%tor(j)%phase,dihe%flexi(i)%tor(j)%vtor,  &
-                dihe%flexi(i)%tor(j)%multi,';',dihe%flexi(i)%tor(j)%stor
+                dihe%flexi(i)%tor(j)%multi!,';',dihe%flexi(i)%tor(j)%stor
            end do 
          end do
        end if
@@ -789,7 +840,7 @@
                                           'type   sigma         epsilon'
        do i = 1, attype%ntype
          write(uni,'(A,5X,A,7X,F7.5,2X,F7.5,3X,A,5X,E12.6,3X,E12.6)')  &
-                       attype%attype(i),attype%bond(i),attype%mass(i), &
+                       attype%atname(i),attype%bond(i),attype%mass(i), &
                        attype%charge(i),attype%ptype(i),               &
                        attype%sig(i),attype%eps(i)
        end do 
@@ -807,7 +858,7 @@
        write(uni,'(A)') '[ atoms ]'
        write(uni,'(A)') ';   nr  type  resi  res  atom  cgnr     c'//  &
                                                        'harge      mass'
-
+!
        do i = 1, atom%nat
          write(uni,'(1X,I5,1X,A,1X,I4,2(1X,A),1X,I4,4X,F9.6,4X,F9.5)') &
                          atom%atnr(i),atom%attype(i),atom%resnr(i),    &

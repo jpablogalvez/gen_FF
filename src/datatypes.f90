@@ -27,7 +27,7 @@
        end type grodefaults 
 !
        type groattype
-         character(len=5),dimension(:),allocatable  ::  attype   !  Atom type
+         character(len=5),dimension(:),allocatable  ::  atname   !  Atom type
          character(len=5),dimension(:),allocatable  ::  bond     !  Bonded type
          character(len=1),dimension(:),allocatable  ::  ptype    !  Particle type
          real(kind=8),dimension(:),allocatable      ::  mass     !  Atom mass

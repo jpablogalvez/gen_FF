@@ -72,7 +72,7 @@
 !
         type(grotop)                                   ::  reftop   !  New topology
         type(grotop)                                   ::  top      !  New topology
-        type(dihedrals)                                ::  dihed    !  Dihedrals
+        type(dihedrals)                                ::  dihe     !  Dihedrals
 ! 
 ! Atom types information
 !
@@ -116,6 +116,12 @@
 !
        tcpu  = 0.0d0
 !
+! Reading command line options
+!
+       call command_line(inp,ref,intop,topout,qmout,knei,iroute,       &
+                         formt,meth,basis,disp,chrg,mult,resname,      &
+                         fsymm,debug)
+!
 ! Defaults
 !
       top%def%nbfunc  = 1
@@ -124,13 +130,8 @@
       top%def%fudgelj = 0.5d0
       top%def%fudgeqq = 0.5d0/0.6d0
 !
+      top%mol%resname = resname
       top%mol%nrexcl  = 3
-!
-! Reading command line options
-!
-       call command_line(inp,ref,intop,topout,qmout,knei,iroute,       &
-                         formt,meth,basis,disp,chrg,mult,resname,      &
-                         fsymm,debug)
 !
 ! Printing summary of the input information
 !
@@ -162,7 +163,7 @@
          bas = bas(:len_trim(bas)-3)
        end if
 !
-       xyz   = trim(bas)//'.xyz'
+       xyz = trim(bas)//'.xyz'
 !
 ! Extracting topology basename from topology input file name  
 !
@@ -208,11 +209,24 @@
 !
        end if
 !
+       if ( fqmout ) then
+         write(*,*)
+         write(*,'(2X,68("*"))')
+         write(*,'(3X,A)') 'NOTE:  QC output found in working directory'
+         write(*,*)
+         write(*,'(3X,A)') 'Force field will be generated from QM information'
+         write(*,'(3X,A)') 'QC output name : '//trim(qmout)
+         write(*,'(2X,68("*"))')
+         write(*,*)  
+       end if
+!
 ! Checking if a reference topology is provided
 !
        if ( len_trim(intop) .gt. 0 ) then
 !
          call read_top(reftop,itype,intop,uniinp)
+!
+         nat = reftop%nat       
 !
        else if ( .NOT. fqmout ) then 
 !
@@ -286,12 +300,6 @@
 !
        end if
 !
-! Allocating general variables
-!
-       allocate(adj(nat,nat),eqv(nat,nat),idat(nat))
-       allocate(ilab(nat),newlab(nat),eqlab(nat))
-       allocate(mindis(nat,nat),ideg(nat))
-!
 !  If reference geometry is provided extract atomic positions and labels
 !
        geo = qmout
@@ -318,7 +326,9 @@
 !
 ! Allocating general variables
 !
-
+       allocate(adj(nat,nat),eqv(nat,nat),idat(nat))
+       allocate(ilab(nat),newlab(nat),eqlab(nat))
+       allocate(mindis(nat,nat),ideg(nat))
 !
 ! Generation of the adjacency matrix
 ! ----------------------------------  !  TODO: check bonds are consistent with input topology
@@ -327,7 +337,11 @@
 !
 ! If only initial topology is provided then generate topology from bonds
 !
-         call bonds2adj(top%bonded%nbond,top%bonded%ibond,nat,adj)
+         call bonds2adj(reftop%bonded%nbond,reftop%bonded%ibond,nat,adj)
+!
+         allocate(lab(nat))
+!
+         lab(:) = reftop%atom%attype(:)
 !
        else
 !
@@ -359,39 +373,29 @@
 !  Cycles identification
 !
        call findcycle(nedge,nat,rank,adj,mcycle,ncycle,cycles)
-! 
-!~ write(*,*) 'Cycles'
-!~ write(*,*) '------'
-!~ write(*,*) 'mcycle ',mcycle
-!~ write(*,*) 'ncycle:'
-!~ write(*,*) ncycle(:rank)
-!~ write(*,*) '----------------------------------------------'
-!~ do i = 1, nat
-!~   write(*,*) (cycles(i,j),j=1,rank) 
-!~ end do
-!~ write(*,*)
 !
-!      if ( debug ) then
-!         write(*,*) 'Cycle information'
-!         write(*,*) '-----------------'
-!         do i = 1, mcycle
-!           write(*,*) 'Cycle Number', i, ':',(cycles(i,j),j=1,ncycle(i))
-!         end do
-!         write(*,*)
-!       end if
+       if ( debug ) then
+         write(*,*) 'Cycle information'
+         write(*,*) '-----------------'
+         write(*,*) ' Number of cycles',mcycle
+         do i = 1, mcycle
+           write(*,*) 'Cycle Number', i, ':',(cycles(i,j),j=1,ncycle(i))
+         end do
+         write(*,*)
+       end if
 !
 !  Computing minimum distance matrix  
 !
        call dijkunwundir(nat,adj,mindis)
 !
-!       if ( debug ) then
-!         write(*,*) 'Minimum distances'
-!         write(*,*) '-----------------'
-!         do i = 1, nat
-!           write(*,'(20(1X,I10))') (mindis(i,j),j=1,nat)
-!         end do
-!         write(*,*)
-!       end if
+       if ( debug ) then
+         write(*,*) 'Minimum distance matrix'
+         write(*,*) '-----------------------'
+         do i = 1, nat
+           write(*,'(20(1X,I10))') (mindis(i,j),j=1,nat)
+         end do
+         write(*,*)
+       end if
 !
        if ( maxval(mindis) .le. knei ) then
          write(*,'(2X,68("="))')
@@ -423,6 +427,7 @@
        if ( len_trim(intop) .eq. 0 )  then
          call strnormlabels(nat,lab,ilab,nlab)         
          allocate(itype(nat))
+         itype(:) = ilab(:)
        else
          ilab(:) = itype(:)
          nlab    = reftop%attype%ntype
@@ -451,19 +456,18 @@
        call gentypes(nat,eqv,lab,newlab,ilab,nlab,eqlab,idat,nidat,    &
                      debug)
 !
-!
        top%nat = nat
 !
-       allocate(top%attype%attype(top%nat),top%attype%bond(top%nat), &
-                top%attype%ptype(top%nat),top%attype%atnum(top%nat), &
-                top%attype%mass(top%nat),top%attype%charge(top%nat), &
-                top%attype%sig(top%nat),top%attype%eps(top%nat))
+       allocate(top%attype%atname(nat),top%attype%bond(nat),           &
+                top%attype%ptype(nat),top%attype%atnum(nat),           &
+                top%attype%mass(nat),top%attype%charge(nat),           &
+                top%attype%sig(nat),top%attype%eps(nat))
 !
-       allocate(top%atom%attype(top%nat),top%atom%residue(top%nat),  &
-                top%atom%atom(top%nat),top%atom%mass(top%nat),       &
-                top%atom%charge(top%nat),top%atom%cgnr(top%nat),     &
-                top%atom%atnr(top%nat),top%atom%resnr(top%nat),      &
-                top%atom%itype(top%nat))
+       allocate(top%atom%attype(nat),top%atom%residue(nat),            &
+                top%atom%atom(nat),top%atom%mass(nat),                 &
+                top%atom%charge(nat),top%atom%cgnr(nat),               &
+                top%atom%atnr(nat),top%atom%resnr(nat),                &
+                top%atom%itype(nat))
 !
        if ( len_trim(intop) .gt. 0 ) then
          top%def = reftop%def
@@ -472,7 +476,7 @@
 !
 ! Generating new atomtypes section
 !
-       top%attype%ntype = nidat
+       top%attype%ntype     = nidat
        top%attype%ptype(:)  = 'A'
        top%attype%mass(:)   = 0.0d0
        top%attype%charge(:) = 0.0d0
@@ -484,7 +488,7 @@
        do i = 1, nat
          match = .FALSE.
          do j = 1, k
-           if ( newlab(i) .eq. top%attype%attype(j) ) then
+           if ( newlab(i) .eq. top%attype%atname(j) ) then
              match = .TRUE.
              top%atom%itype(i) = j
              exit
@@ -496,7 +500,7 @@
 !
            top%atom%itype(i) = k
 !
-           top%attype%attype(k) = newlab(i)
+           top%attype%atname(k) = newlab(i)
            top%attype%bond(k)   = newlab(i) 
 !
            if ( len_trim(intop) .gt. 0 ) then
@@ -542,7 +546,7 @@
        if ( fqmout ) then
 !
          call genffbonded(nat,coord,adj,ideg,lcycle,lrigid,            &
-                          znum,top%bonded,dihed,iroute,debug)
+                          znum,top%bonded,dihe,iroute,debug)
 !
        else
 !
@@ -569,19 +573,21 @@
                   top%bonded%c4(reftop%bonded%ndihe),                  &
                   top%bonded%c5(reftop%bonded%ndihe))
 !
-         top%bonded = reftop%bonded
+         top%bonded = reftop%bonded 
+!
+         call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
        end if
 !
 ! Symmetrizing force field terms
 ! ------------------------------
 !
-       call symffbonded(nat,nidat,idat,top%bonded,dihed,fsymm,debug)
+       call symffbonded(nat,nidat,idat,top%bonded,dihe,fsymm,debug)
 !
 ! Printing force field
 ! --------------------
 !
-       call print_top(unitop,nat,itype,mindis,top,dihed,bas,geo,intop,topout,debug)
+       call print_top(unitop,nat,itype,mindis,top,dihe,bas,geo,intop,topout,debug)
 !
 ! Printing JOYCE input files
 ! --------------------------
@@ -592,23 +598,24 @@
 !
 ! Printing summary of the input information
 !
-       if ( fqmout ) then
-         call print_title(6,1,'Output information','-')
-         write(*,*)
+       call print_title(6,1,'Output information','-')
+       write(*,*)
 !
-         write(*,*) 'Atomtyping'
-         write(*,*) '----------'
-         do i = 1, nat
-           write(*,'(2(1X,I3),2(1X,A5,1X,I3))') i,ilab(i),lab(i),        &
+       write(*,*) 'Atomtyping'
+       write(*,*) '----------'
+       do i = 1, nat
+         write(*,'(2(1X,I3),2(1X,A5,1X,I3))') i,ilab(i),lab(i),        &
                                               eqlab(i),newlab(i),idat(i)
-         end do
-         write(*,*)
+       end do
+       write(*,*)
+!
+       if ( fqmout ) then
 !
          write(*,*) 'Bond-stretching terms'
          write(*,*) '---------------------'
          do i = 1, top%bonded%nbond
            write(*,'(1X,I3,3(1X,A,1X,I3),1X,A,1X,F6.4)') i,'=',top%bonded%ibond(1,i), &
-                                 '-',top%bonded%ibond(2,i),':',top%bonded%idbond(i),'=',top%bonded%bond(i)
+                                 '-',top%bonded%ibond(2,i)!,':',top%bonded%idbond(i),'=',top%bonded%bond(i)
          end do
          write(*,*)
 !
@@ -617,47 +624,47 @@
          write(*,*) '-------------------'
          do i = 1, top%bonded%nang
            write(*,'(1X,I3,4(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',top%bonded%iang(1,i), &
-                     '-',top%bonded%iang(2,i),'-',top%bonded%iang(3,i),':',top%bonded%idang(i),'=',top%bonded%ang(i)
+                     '-',top%bonded%iang(2,i),'-',top%bonded%iang(3,i)!,':',top%bonded%idang(i),'=',top%bonded%ang(i)
          end do
+         write(*,*)
 !
-!
-         if ( dihed%ndihe .gt. 0 ) then
+         if ( dihe%ndihe .gt. 0 ) then
            write(*,*) 'Dihedral terms'
            write(*,*) '--------------'
          end if
 !
-         if ( dihed%nimpro .gt. 0 ) then
+         if ( dihe%nimpro .gt. 0 ) then
            write(*,*) '; Impropers o.o.p'
-           do i = 1, dihed%nimpro
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihed%iimpro(1,i), &
-     '-',dihed%iimpro(2,i),'-',dihed%iimpro(3,i),'-',dihed%iimpro(4,i),':',dihed%idimpro(i),'=',dihed%dimpro(i)
+           do i = 1, dihe%nimpro
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%iimpro(1,i), &
+     '-',dihe%iimpro(2,i),'-',dihe%iimpro(3,i),'-',dihe%iimpro(4,i)!,':',dihe%idimpro(i),'=',dihe%dimpro(i)
            end do
            write(*,*)
          end if
 !
-         if ( dihed%ninv .gt. 0 ) then
+         if ( dihe%ninv .gt. 0 ) then
            write(*,*) '; Inversion dihedrals'
-           do i = 1, dihed%ninv
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihed%iinv(1,i), &
-     '-',dihed%iinv(2,i),'-',dihed%iinv(3,i),'-',dihed%iinv(4,i),':',dihed%idinv(i),'=',dihed%dinv(i)
+           do i = 1, dihe%ninv
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%iinv(1,i), &
+     '-',dihe%iinv(2,i),'-',dihe%iinv(3,i),'-',dihe%iinv(4,i)!,':',dihe%idinv(i),'=',dihe%dinv(i)
            end do
            write(*,*)
          end if
 !
-         if ( dihed%nrigid .gt. 0 ) then
+         if ( dihe%nrigid .gt. 0 ) then
            write(*,*) '; Impropers on double bonds/aromatic cycles'
-           do i = 1, dihed%nrigid
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihed%irigid(1,i), &
-     '-',dihed%irigid(2,i),'-',dihed%irigid(3,i),'-',dihed%irigid(4,i),':',dihed%idrigid(i),'=',dihed%drigid(i)
+           do i = 1, dihe%nrigid
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%irigid(1,i), &
+     '-',dihe%irigid(2,i),'-',dihe%irigid(3,i),'-',dihe%irigid(4,i)!,':',dihe%idrigid(i),'=',dihe%drigid(i)
            end do
            write(*,*)
          end if
 !
-         if ( dihed%nflexi .gt. 0 ) then
+         if ( dihe%nflexi .gt. 0 ) then
            write(*,*) '; Flexible'
-           do i = 1, dihed%nflexi
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihed%iflexi(1,i),  &
-      '-',dihed%iflexi(2,i),'-',dihed%iflexi(3,i),'-',dihed%iflexi(4,i),':',dihed%idflexi(i),'=',dihed%dflexi(i)
+           do i = 1, dihe%nflexi
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%iflexi(1,i),  &
+      '-',dihe%iflexi(2,i),'-',dihe%iflexi(3,i),'-',dihe%iflexi(4,i)!,':',dihe%idflexi(i),'=',dihe%dflexi(i)
            end do
            write(*,*)
          end if
@@ -669,28 +676,29 @@
 !
 ! Deallocating topology information
 !
-!~        if ( fqmout ) then
-!~          deallocate(top%attype%attype,top%attype%bond,                 &
-!~                     top%attype%ptype,top%attype%atnum,                 &
-!~                     top%attype%mass,top%attype%charge,                 &
-!~                     top%attype%sigma,top%attype%eps)
-!~ !
-!~          deallocate(top%atom%attype,top%atom%residue,top%atom%atom,    &
-!~                     top%atom%mass,top%atom%charge,top%atom%cgnr,       &
-!~                     top%atom%atnr,top%atom%resnr)
+!       if ( fqmout ) then
+!         deallocate(top%attype%atname,top%attype%bond,                 &
+!                    top%attype%ptype,top%attype%atnum,                 &
+!                    top%attype%mass,top%attype%charge,                 &
+!                    top%attype%mass,top%attype%charge,                 &
+!                    top%attype%sigma,top%attype%eps)
 !
-!~          deallocate(top%bonded%bond,top%bonded%kbond,                  &
-!~                     top%bonded%ibond,top%bonded%ang,                 &
-!~                     top%bonded%kang,top%bonded%iang,               &
-!~                     top%bonded%dihe,top%bonded%kdihe,                  &
-!~                     top%bonded%idihe,top%bonded%multi)
-!~        end if
+!         deallocate(top%atom%attype,top%atom%residue,top%atom%atom,    &
+!                    top%atom%mass,top%atom%charge,top%atom%cgnr,       &
+!                    top%atom%atnr,top%atom%resnr)
+!
+!         deallocate(top%bonded%bond,top%bonded%kbond,                  &
+!                    top%bonded%ibond,top%bonded%ang,                 &
+!                    top%bonded%kang,top%bonded%iang,               &
+!                    top%bonded%dihe,top%bonded%kdihe,                  &
+!                    top%bonded%idihe,top%bonded%multi)
+!       end if
 !
 ! Deallocating reference topology information
 !
        if ( len_trim(intop) .gt. 0 ) then
 !
-         deallocate(reftop%attype%attype,reftop%attype%bond,           &
+         deallocate(reftop%attype%atname,reftop%attype%bond,           &
                     reftop%attype%ptype,reftop%attype%atnum,           &
                     reftop%attype%mass,reftop%attype%charge,           &
                     reftop%attype%sig,reftop%attype%eps)
@@ -718,18 +726,19 @@
 !
 ! Deallocating local variables
 !
-!~        deallocate(itype)
-       deallocate(mass,znum)
+!       deallocate(itype)
 ! 
-       if ( fqmout ) then
-         deallocate(wiberg,lcycle,lrigid)
-       end if
-!
-       deallocate(adj,mindis,ideg)
-       deallocate(cycles,ncycle)
-       deallocate(ilab,eqlab,idat,newlab)
-!
-1000   deallocate(coord,lab)
+!~        if ( fqmout ) then
+!~          deallocate(mass,znum)
+!~          deallocate(wiberg,lcycle,lrigid)
+!~        end if
+!~ !
+!~        deallocate(adj,mindis,ideg)
+!~        deallocate(cycles,ncycle)
+!~        deallocate(ilab,eqlab,idat,newlab)
+!~ !
+!~ 1000   deallocate(coord,lab)
+1000   continue
 !
 ! Printing timings
 !
@@ -982,7 +991,8 @@
                                                                'opology'
        write(*,'(2X,A)') '-qc,--qmout             QC input file name'
        write(*,*) 
-      write(*,'(2X,A)') '-knei,--knei             K-nearest neighbor'
+       write(*,'(2X,A)') '-knei,--knei            K-nearest neighbor'
+       write(*,'(2X,A)') '-iroute','--iroute      Functional form of the FF'
        write(*,*)
        write(*,'(2X,A)') '-fmt,--format           Format of QC input'
        write(*,'(2X,A)') '                         ( gaussian | orca )'

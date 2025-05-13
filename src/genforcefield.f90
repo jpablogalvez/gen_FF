@@ -15,7 +15,8 @@
                    eqvatms,                                            &
                    nearnei,                                            &
                    genrigidlist,                                       &
-                   gencyclelist
+                   gencyclelist,                                       &
+                   bonded2dihe
 !
        contains
 !
@@ -1196,14 +1197,14 @@
 !
 ! We consider rigid bond 
 !  if Wiberg index is greater than 1.5 it is a double bond
-!  if Wiberg index is greater than 1.25 and the bond belongs to a cycle
+!  if Wiberg index is greater than 1.1 and the bond belongs to a cycle
 !   then it belongs to an aromatic cycle
 !
        do i = 1, nat-1
          do j = i+1, nat
 !
            if ( (wiberg(j,i).ge.1.5d0) .or.                            &
-                        ((wiberg(j,i).ge.1.1d0).and.lcycle(j,i)) ) then ! 1.25d0 -> 1.15
+                         ((wiberg(j,i).ge.1.1d0).and.lcycle(j,i)) ) then 
              lrigid(i,j) = .TRUE.
              lrigid(j,i) = .TRUE.
            end if
@@ -2116,6 +2117,205 @@
 !
        return
        end subroutine symdihe
+!
+!======================================================================!
+!
+! BONDED2DIHE - BONDED TO DIHEdral datatype
+!
+! This subroutine 
+!
+       subroutine bonded2dihe(ndihe,bonded,dihe,nat,adj)
+!
+       use datatypes,  only:  grobonded,                               &
+                              dihedrals
+!
+       use printings,  only:  print_end
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(grobonded),intent(in)             ::  bonded   !
+       type(dihedrals),intent(out)            ::  dihe     !
+       logical,dimension(nat,nat),intent(in)  ::  adj      !
+       integer,intent(in)                     ::  ndihe    !
+       integer,intent(in)                     ::  nat      !
+!
+! Local variables
+!
+       logical,dimension(ndihe)               ::  ldihe    !
+       logical,dimension(ndihe)               ::  visited  !
+       integer                                ::  i,j,k    !
+!
+!  Setting DIHE datatype from BONDED datatype
+! -------------------------------------------
+!
+! Allocating information
+!
+       allocate(dihe%iimpro(4,ndihe),dihe%dimpro(ndihe),               &
+                dihe%kimpro(ndihe),dihe%fimpro(ndihe))
+!
+       allocate(dihe%iinv(4,ndihe),dihe%dinv(ndihe),                   &
+                dihe%kinv(ndihe),dihe%finv(ndihe))
+!
+       allocate(dihe%irigid(4,ndihe),dihe%drigid(ndihe),               &
+                dihe%krigid(ndihe),dihe%frigid(ndihe))
+!
+       allocate(dihe%flexi(ndihe))
+       allocate(dihe%iflexi(4,ndihe),dihe%dflexi(ndihe),               &
+                dihe%kflexi(ndihe),dihe%fflexi(ndihe))
+!
+       dihe%ndihe  = ndihe 
+       dihe%nflexi = 0 
+       dihe%nrigid = 0 
+       dihe%nimpro = 0 
+       dihe%ninv   = 0 
+!
+       visited(:) = .FALSE.
+!
+! Setting up improper, inversion, and flexible dihedral
+!
+       do i = 1, ndihe
+!
+         if ( visited(i) ) cycle
+!         
+         if ( bonded%fdihe(i) .eq. 1 ) then        !  Proper dihedral
+!
+           visited(i) = .TRUE.
+!
+           dihe%nflexi = dihe%nflexi + 1
+!
+           dihe%flexi(dihe%nflexi)%ntor = 1
+           allocate(dihe%flexi(dihe%nflexi)%tor(1)) 
+!
+           dihe%fflexi(dihe%nflexi)     = 1
+!
+           dihe%flexi(dihe%nflexi)%itor(:) = bonded%idihe(:,i)
+           dihe%iflexi(:,dihe%nflexi)      = bonded%idihe(:,i)
+!
+           dihe%flexi(dihe%nflexi)%tor(1)%phase = bonded%dihe(i)
+           dihe%flexi(dihe%nflexi)%tor(1)%vtor  = bonded%kdihe(i)
+           dihe%flexi(dihe%nflexi)%tor(1)%multi = bonded%multi(i)
+!
+         else if ( bonded%fdihe(i) .eq. 2 ) then   !  Improper dihedral
+!
+! Checking if the improper dihedral corresponds to an 
+!  out of plane bending or a double (rigid) bond
+!
+           visited(i) = .TRUE.
+!
+           if ( (adj(bonded%idihe(1,i),bonded%idihe(2,i))) .and.       &
+                (adj(bonded%idihe(2,i),bonded%idihe(3,i))) .and.       &
+                (adj(bonded%idihe(3,i),bonded%idihe(4,i))) ) then
+!
+             dihe%nrigid = dihe%nrigid + 1
+!
+             dihe%frigid(dihe%nrigid)   = 2
+             dihe%irigid(:,dihe%nrigid) = bonded%idihe(:,i)
+             dihe%drigid(dihe%nrigid)   = bonded%dihe(i)
+             dihe%krigid(dihe%nrigid)   = bonded%kdihe(i)
+!
+           else
+!
+             dihe%nimpro = dihe%nimpro + 1
+!
+             dihe%frigid(dihe%nimpro)   = 2
+             dihe%irigid(:,dihe%nimpro) = bonded%idihe(:,i)
+             dihe%drigid(dihe%nimpro)   = bonded%dihe(i)
+             dihe%krigid(dihe%nimpro)   = bonded%kdihe(i)
+!
+           end if
+!
+         else if ( bonded%fdihe(i) .eq. 3 ) then   !  Ryckaert-Bellemans dihedral
+!
+! TODO: convert to linear combination of proper dihedrals
+!
+           stop 'Ryckaert-Bellemans dihedral not supported'
+!
+         else if ( bonded%fdihe(i) .eq. 4 ) then   !  Periodic improper dihedral
+!
+           stop 'Periodic improper dihedral not supported'
+!
+         else if ( bonded%fdihe(i) .eq. 5 ) then   !  Fourier dihedral
+!
+! TODO: convert to linear combination of proper dihedrals
+!
+           stop 'Fourier dihedral not supported'
+!
+         else if ( bonded%fdihe(i) .eq. 9 ) then   !  Multiple roper dihedral
+!
+! Finding number of terms in the Fouier expansion and unique dihedrals
+!
+           visited(i) = .TRUE.
+!
+           dihe%nflexi = dihe%nflexi + 1
+!
+           dihe%fflexi(dihe%nflexi)   = 9
+           dihe%iflexi(:,dihe%nflexi) = bonded%idihe(:,i)
+!
+           dihe%flexi(dihe%nflexi)%itor(:) = bonded%idihe(:,i)
+!
+           ldihe(:) = .FALSE.
+           ldihe(i) = .TRUE.
+!
+! Counting the proper dihedrals functions sharing the same quadruplet
+!
+           dihe%flexi(dihe%nflexi)%ntor = 1
+           do j = i+1, ndihe 
+!
+             if ( visited(j) ) cycle
+             if ( (bonded%idihe(1,i).eq.bonded%idihe(1,j)) .and.       &
+                  (bonded%idihe(2,i).eq.bonded%idihe(2,j)) .and.       &
+                  (bonded%idihe(3,i).eq.bonded%idihe(3,j)) .and.       &
+                  (bonded%idihe(4,i).eq.bonded%idihe(4,j)) ) then
+!
+               visited(j) = .TRUE.
+               ldihe(j)   = .TRUE.
+!
+               dihe%flexi(dihe%nflexi)%ntor = dihe%flexi(dihe%nflexi)%ntor + 1
+!                 
+             end if
+!
+           end do
+!
+           allocate(dihe%flexi(dihe%nflexi)%tor(dihe%flexi(dihe%nflexi)%ntor)) 
+!
+! Setting multiple dihedrals sharing the same quadruplet 
+!
+           k = 0
+           do j = 1, ndihe
+             if ( ldihe(j) ) then
+               k = k + 1
+!
+               dihe%flexi(dihe%nflexi)%tor(k)%phase = bonded%dihe(j)
+               dihe%flexi(dihe%nflexi)%tor(k)%vtor  = bonded%kdihe(j)
+               dihe%flexi(dihe%nflexi)%tor(k)%multi = bonded%multi(j)
+             end if
+           end do
+!
+           if ( k .ne. dihe%flexi(dihe%nflexi)%ntor ) then
+             write(*,*)
+             write(*,'(2X,68("="))')
+             write(*,'(3X,A)') 'ERROR:  Datatype transformation is wrong'
+             write(*,*)
+             write(*,'(3X,A,4I4)') 'Target quadruplet :',bonded%idihe(:,i)
+             write(*,'(3X,A,I3)')  'Number of expected terms :',dihe%flexi(dihe%nflexi)%ntor
+             write(*,'(3X,A,I3)')  'Number of terms found    :',k
+             write(*,'(2X,68("="))')
+             write(*,*)
+             call print_end()  
+           end if
+!
+         else if ( bonded%fdihe(i) .eq. 10 ) then  !  Restricted dihedral
+!
+           stop 'Restricted dihedral not supported'
+!
+         end if
+!
+       end do
+!
+       return
+       end subroutine bonded2dihe
 !
 !======================================================================!
 !
