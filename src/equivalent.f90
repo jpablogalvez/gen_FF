@@ -274,6 +274,8 @@
          call read_bond(reftop%bonded,intop,uniinp)
          call read_angle(reftop%bonded,intop,uniinp)
          call read_dihe(reftop%bonded,intop,uniinp)
+!~          call read_pairs(reftop%nonbonded,intop,uniinp)
+!~          call read_excls(reftop%nonbonded,intop,uniinp)
 !
        else
 !
@@ -577,12 +579,15 @@
 !
          call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
+! TODO: check if equilibrium distances should be taken from external geometry
+!
        end if
 !
 ! Symmetrizing force field terms
 ! ------------------------------
 !
-       call symffbonded(nat,nidat,idat,top%bonded,dihe,fsymm,debug)
+       if ( fsymm ) call symffbonded(nat,nidat,idat,top%bonded,dihe,   &
+                                     debug)
 !
 ! Printing force field
 ! --------------------

@@ -929,7 +929,7 @@
 !
 ! This subroutine 
 !
-       subroutine symffbonded(nat,nidat,idat,bonded,dihed,fsymm,debug)
+       subroutine symffbonded(nat,nidat,idat,bonded,dihed,debug)
 !
        use datatypes,   only: grobonded,                               &
                               dihedrals
@@ -946,7 +946,6 @@
        integer,intent(in)                           ::  nat       ! 
        integer,intent(in)                           ::  nidat     ! 
 !
-       logical,intent(in)                           ::  fsymm     !
        logical,intent(in)                           ::  debug     !  Debug mode
 !
 ! Local variables
@@ -973,7 +972,8 @@
          bonded%sbond(i) = iterm
        end do
 !
-       if ( fsymm ) call symterm(bonded%nbond,bonded%idbond,bonded%bond,bonded%sbond,debug)
+       call symterm(bonded%nbond,bonded%idbond,bonded%bond,            &
+                    bonded%sbond,debug)
 !
 !  Finding equivalent angle-bending terms
 !
@@ -989,8 +989,8 @@
          bonded%sang(i) = iterm
        end do
 !
-       if ( fsymm ) call symterm(bonded%nang,bonded%idang,bonded%ang,bonded%sang,   &
-                                 debug)
+       call symterm(bonded%nang,bonded%idang,bonded%ang,bonded%sang,   &
+                    debug)
 !
 !  Finding equivalent dihedrals terms
 !
@@ -1091,22 +1091,20 @@
 ! Symmetrizing dihedral terms
 !
 ! FIXME: problem symmetrizing -179 and 179 dihedrals
-       if ( fsymm ) then
-         if ( dihed%nimpro .gt. 0 ) then
-           call symdihe(dihed%nimpro,dihed%idimpro,dihed%dimpro,dihed%simpro,.TRUE.,debug)
-         end if 
+       if ( dihed%nimpro .gt. 0 ) then
+         call symdihe(dihed%nimpro,dihed%idimpro,dihed%dimpro,dihed%simpro,.TRUE.,debug)
+       end if 
 !
-         if ( dihed%ninv .gt. 0 ) then
-           call symdihe(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,.TRUE.,debug)
-         end if 
+       if ( dihed%ninv .gt. 0 ) then
+         call symdihe(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,.TRUE.,debug)
+       end if 
 !
-         if ( dihed%nrigid .gt. 0 ) then
-           call symdihe(dihed%nrigid,dihed%idrigid,dihed%drigid,dihed%srigid,.TRUE.,debug)
-         end if 
+       if ( dihed%nrigid .gt. 0 ) then
+         call symdihe(dihed%nrigid,dihed%idrigid,dihed%drigid,dihed%srigid,.TRUE.,debug)
+       end if 
 !
-         if ( dihed%nflexi .gt. 0 ) then
-           call symdihe(dihed%nflexi,dihed%idflexi,dihed%dflexi,dihed%sflexi,.FALSE.,debug)
-         end if
+       if ( dihed%nflexi .gt. 0 ) then
+         call symdihe(dihed%nflexi,dihed%idflexi,dihed%dflexi,dihed%sflexi,.FALSE.,debug)
        end if
 !
        deallocate(ivaux)
