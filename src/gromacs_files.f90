@@ -590,7 +590,8 @@
 !
 ! This subroutine 
 !
-       subroutine print_top(uni,nat,itype,mindis,top,dihe,bas,geo,intop,topout,debug)
+       subroutine print_top(uni,nat,itype,mindis,top,dihe,bas,geo,     &
+                            intop,topout,flj,fexcl,debug)
 !
        use datatypes,   only:  grotop,                                 &
                                dihedrals
@@ -609,6 +610,8 @@
        integer,dimension(nat),intent(in)      ::  itype    !
        integer,intent(in)                     ::  nat      !
        integer,intent(in)                     ::  uni      !
+       logical,intent(in)                     ::  flj      !  
+       logical,intent(in)                     ::  fexcl    !  
 !
        logical,intent(in)                     ::  debug    !  Debug mode
 !
@@ -632,11 +635,12 @@
 !
 ! Printing pairs section
 !
-       call print_pairs(uni,nat,itype,mindis,top%def,top%attype,top%mol,top%atom)
+       if ( flj ) call print_pairs(uni,nat,itype,mindis,top%def,       &
+                                   top%attype,top%mol,top%atom)
 !
 ! Printing exclusions section
 !
-       call print_exclusions(uni,nat)
+       if ( fexcl) call print_exclusions(uni,nat)
 !
 ! Printing topology file tail
 !
@@ -839,7 +843,7 @@
        write(uni,'(A)') ';name   bond_type     mass     charge   p'//  &
                                           'type   sigma         epsilon'
        do i = 1, attype%ntype
-         write(uni,'(A,5X,A,7X,F7.5,2X,F7.5,3X,A,5X,E12.6,3X,E12.6)')  &
+         write(uni,'(A,5X,A,5X,F7.3,2X,F7.3,3X,A,5X,E12.6,3X,E12.6)')  &
                        attype%atname(i),attype%bond(i),attype%mass(i), &
                        attype%charge(i),attype%ptype(i),               &
                        attype%sig(i),attype%eps(i)

@@ -29,6 +29,8 @@
        integer                                         ::  knei     !  Maximum distance from source node
        integer                                         ::  iroute   !  
        logical                                         ::  fsymm    !
+       logical                                         ::  flj      !
+       logical                                         ::  fexcl    !
        logical                                         ::  debug    !
 !
        character(len=leninp)                           ::  geo      !
@@ -120,7 +122,7 @@
 !
        call command_line(inp,ref,intop,topout,qmout,knei,iroute,       &
                          formt,meth,basis,disp,chrg,mult,resname,      &
-                         fsymm,debug)
+                         fsymm,flj,fexcl,debug)
 !
 ! Defaults
 !
@@ -592,7 +594,8 @@
 ! Printing force field
 ! --------------------
 !
-       call print_top(unitop,nat,itype,mindis,top,dihe,bas,geo,intop,topout,debug)
+       call print_top(unitop,nat,itype,mindis,top,dihe,bas,geo,intop,  &
+                      topout,flj,fexcl,debug)
 !
 ! Printing JOYCE input files
 ! --------------------------
@@ -769,7 +772,7 @@
 !
        subroutine command_line(inp,ref,top,topout,qmout,knei,iroute,   &
                                formt,meth,basis,disp,chrg,mult,        & 
-                               resname,fsymm,debug)
+                               resname,fsymm,flj,fexcl,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -789,6 +792,8 @@
        integer,intent(out)                ::  knei     !  
        integer,intent(out)                ::  iroute   !  
        logical,intent(out)                ::  fsymm    !  
+       logical,intent(out)                ::  flj      !  
+       logical,intent(out)                ::  fexcl    !  
 !
        character(len=20),intent(out)      ::  meth     !
        character(len=20),intent(out)      ::  basis    !
@@ -828,6 +833,8 @@
        mult  = 1
 !
        fsymm = .TRUE.
+       flj   = .FALSE.
+       fexcl = .TRUE.
        debug = .FALSE.
 !
 ! Reading command line
@@ -947,6 +954,19 @@
            case ('-nos','-nosym','-nosymm','--nosymmetrize',           &
                                                    '--nosymm','--nosym')
              fsymm = .FALSE.
+!
+           case ('-lj','-intralj','--lennard-jones')
+             flj = .TRUE.
+!
+           case ('-nolj','-nointralj','--no-lennard-jones')
+
+             flj = .FALSE.
+!
+           case ('-excl','-exclusions','--exclusions')
+             fexcl = .TRUE.
+!
+           case ('-noexcl','-noexclusion','--no-exclusions')
+             fexcl = .FALSE.
 !
            case ('-v','--debug','--verbose')
              debug = .TRUE.

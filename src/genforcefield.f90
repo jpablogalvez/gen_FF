@@ -2217,10 +2217,10 @@
 !
              dihe%nimpro = dihe%nimpro + 1
 !
-             dihe%frigid(dihe%nimpro)   = 2
-             dihe%irigid(:,dihe%nimpro) = bonded%idihe(:,i)
-             dihe%drigid(dihe%nimpro)   = bonded%dihe(i)
-             dihe%krigid(dihe%nimpro)   = bonded%kdihe(i)
+             dihe%fimpro(dihe%nimpro)   = 2
+             dihe%iimpro(:,dihe%nimpro) = bonded%idihe(:,i)
+             dihe%dimpro(dihe%nimpro)   = bonded%dihe(i)
+             dihe%kimpro(dihe%nimpro)   = bonded%kdihe(i)
 !
            end if
 !
@@ -2240,7 +2240,7 @@
 !
            stop 'Fourier dihedral not supported'
 !
-         else if ( bonded%fdihe(i) .eq. 9 ) then   !  Multiple roper dihedral
+         else if ( bonded%fdihe(i) .eq. 9 ) then   !  Multiple proper dihedral
 !
 ! Finding number of terms in the Fouier expansion and unique dihedrals
 !
