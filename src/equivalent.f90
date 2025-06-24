@@ -33,7 +33,7 @@
        integer                                         ::  knei     !  Maximum distance from source node
        integer                                         ::  iroute   !  
        logical                                         ::  fsymm    !
-       logical                                         ::  flj      !
+       logical                                         ::  fpairs   !
        logical                                         ::  fexcl    !
        logical                                         ::  debug    !
 !
@@ -126,7 +126,7 @@
 !
        call command_line(inp,ref,intop,topout,qmout,knei,iroute,       &
                          formt,meth,basis,disp,chrg,mult,sysname,      &
-                         resname,nmol,fsig,feps,fsymm,flj,fexcl,debug)
+                         resname,nmol,fsig,feps,fsymm,fpairs,fexcl,debug)
 !
 ! Defaults
 !
@@ -639,7 +639,7 @@
 ! --------------------
 !
        call print_top(unitop,nat,itype,mindis,top,dihe,bas,geo,intop,  &
-                      topout,flj,fexcl,debug)
+                      topout,fpairs,fexcl,debug)
 !
 ! Printing JOYCE input files
 ! --------------------------
@@ -817,7 +817,7 @@
        subroutine command_line(inp,ref,top,topout,qmout,knei,iroute,   &
                                formt,meth,basis,disp,chrg,mult,        & 
                                sysname,resname,nmol,fsig,feps,fsymm,   &
-                               flj,fexcl,debug)
+                               fpairs,fexcl,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -841,7 +841,7 @@
        integer,intent(out)                ::  knei     !  
        integer,intent(out)                ::  iroute   !  
        logical,intent(out)                ::  fsymm    !  
-       logical,intent(out)                ::  flj      !  
+       logical,intent(out)                ::  fpairs   !  
        logical,intent(out)                ::  fexcl    !  
 !
        character(len=20),intent(out)      ::  meth     !
@@ -886,10 +886,11 @@
        fsig = 1.0
        feps = 1.0
 !
-       fsymm = .TRUE.
-       flj   = .FALSE.
-       fexcl = .TRUE.
-       debug = .FALSE.
+       fsymm  = .TRUE.
+       fpairs = .FALSE.
+       fexcl  = .TRUE.
+!
+       debug  = .FALSE.
 !
 ! Reading command line
 !
@@ -1029,17 +1030,17 @@
                                                    '--nosymm','--nosym')
              fsymm = .FALSE.
 !
-           case ('-lj','-intralj','--lennard-jones')
-             flj = .TRUE.
+           case ('-pairs','-intranb','--intranb','--pairs')
+             fpairs = .TRUE.
 !
-           case ('-nolj','-nointralj','--no-lennard-jones')
+           case ('-nopairs','-nointranb','--nointranb','--no-pairs')
 
-             flj = .FALSE.
+             fpairs = .FALSE.
 !
            case ('-excl','-exclusions','--exclusions')
              fexcl = .TRUE.
 !
-           case ('-noexcl','-noexclusion','--no-exclusions')
+           case ('-noexcl','-noexclusions','--no-exclusions','--noexclusions')
              fexcl = .FALSE.
 !
            case ('-v','--debug','--verbose')
@@ -1078,30 +1079,46 @@
        write(*,'(1X,A)') 'Command-line options'
        write(*,'(1X,20("-"))')
        write(*,*)
-       write(*,'(2X,A)') '-h,--help               Print usage info'//  &
-                                                       'rmtion and exit'
+       write(*,'(2X,A)') '-h,--help                    Print usage'//  &
+                                                  ' informtion and exit'
        write(*,*)
-       write(*,'(2X,A)') '-f,--file               Input file name'
-       write(*,'(2X,A)') '-c,--coordinates        Input coordinate'//  &
-                                                                's name'
-       write(*,'(2X,A)') '-p,--input-topology     Input Gromacs to'//  &
-                                                                'pology'
-       write(*,'(2X,A)') '-t,--output-topology    Output Gromacs t'//  & 
-                                                               'opology'
-       write(*,'(2X,A)') '-qc,--qmout             QC input file name'
+       write(*,'(2X,A)') '-f,--file                    Input file name'
+       write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
+                                                           'inates name'
+       write(*,'(2X,A)') '-p,--input-topology          Input Groma'//  &
+                                                           'cs topology'
+       write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  & 
+                                                          'acs topology'
+       write(*,'(2X,A)') '-qc,--qmout                  QC input file name'
        write(*,*) 
-       write(*,'(2X,A)') '-knei,--knei            K-nearest neighbor'
-       write(*,'(2X,A)') '-iroute','--iroute      Functional form of the FF'
+       write(*,'(2X,A)') '-sysname,--system-name       System name'  
+       write(*,'(2X,A)') '-resname,--residue-name      Molecule name'  
+       write(*,'(2X,A)') '-nmol,--number-molecules     Number of m'//  &
+                                                'olecules in the system'  
+       write(*,*) 
+       write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'
+       write(*,'(2X,A)') '-iroute,--iroute             Functional '//  &
+                                                        'form of the FF'
+       write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  &
+                                                       'output topology'  
+       write(*,'(2X,A)') '-[no]pairs,--[no]intranb     Add pairs'
+       write(*,'(2X,A)') '-[no]excl,--[no]exclusions   Add exclusions'
        write(*,*)
-       write(*,'(2X,A)') '-fmt,--format           Format of QC input'
-       write(*,'(2X,A)') '                         ( gaussian | orca )'
-       write(*,'(2X,A)') '-meth,--method          QM method'
-       write(*,'(2X,A)') '-bas,--basis            Basis set'
-       write(*,'(2X,A)') '-disp,--dispersion      Dispersion correction'
-       write(*,'(2X,A)') '-chrg,--charge          Molecular charge'
-       write(*,'(2X,A)') '-mult,--multiplicity    Spin multiplicity'
+       write(*,'(2X,A)') '-fsig,--factor-sigma         Scale sigma'//  &
+                                                               ' values'
+       write(*,'(2X,A)') '-feps,--factor-epsilon       Scale epsil'//  &
+                                                             'on values'
        write(*,*)
-       write(*,'(2X,A)') '-v,--verbose            Debug mode'
+       write(*,'(2X,A)') '-fmt,--format                Format of QC input'
+       write(*,'(2X,A)') '                              ( gaussian | orca )'
+       write(*,'(2X,A)') '-meth,--method               QM method'
+       write(*,'(2X,A)') '-bas,--basis                 Basis set'
+       write(*,'(2X,A)') '-disp,--dispersion           Dispersion '//  &
+                                                            'correction'
+       write(*,'(2X,A)') '-chrg,--charge               Molecular charge'
+       write(*,'(2X,A)') '-mult,--multiplicity         Spin multiplicity'
+       write(*,*)
+       write(*,'(2X,A)') '-v,--verbose                 Debug mode'
        write(*,*)
 !
        return

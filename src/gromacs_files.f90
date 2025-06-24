@@ -637,7 +637,7 @@
 ! This subroutine 
 !
        subroutine print_top(uni,nat,itype,mindis,top,dihe,bas,geo,     &
-                            intop,topout,flj,fexcl,debug)
+                            intop,topout,fpairs,fexcl,debug)
 !
        use datatypes,   only:  grotop,                                 &
                                dihedrals
@@ -656,7 +656,7 @@
        integer,dimension(nat),intent(in)      ::  itype    !
        integer,intent(in)                     ::  nat      !
        integer,intent(in)                     ::  uni      !
-       logical,intent(in)                     ::  flj      !  
+       logical,intent(in)                     ::  fpairs   !  
        logical,intent(in)                     ::  fexcl    !  
 !
        logical,intent(in)                     ::  debug    !  Debug mode
@@ -681,8 +681,8 @@
 !
 ! Printing pairs section
 !
-       if ( flj ) call print_pairs(uni,nat,itype,mindis,top%def,       &
-                                   top%attype,top%mol,top%atom)
+       if ( fpairs ) call print_pairs(uni,nat,itype,mindis,top%def,    &
+                                     top%attype,top%mol,top%atom)
 !
 ! Printing exclusions section
 !
