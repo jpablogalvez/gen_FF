@@ -3,7 +3,7 @@
        program evaluation
 !
        use timings
-       use lengths,       only:  leninp,lentag,lenlab
+       use lengths,       only:  leninp,lentag,lenlab,lenarg
        use units,         only:  uniinp,uniic,unideps,                 &
                                  unitop,uninb,unicorr
 !
@@ -25,7 +25,11 @@
        character(len=leninp)                           ::  intop    !
        character(len=leninp)                           ::  topout   !
        character(len=leninp)                           ::  qmout    !
+       character(len=lenarg)                           ::  sysname  !
        character(len=lenlab)                           ::  resname  !
+       real(kind=8)                                    ::  fsig     !
+       real(kind=8)                                    ::  feps     !
+       integer                                         ::  nmol     !  
        integer                                         ::  knei     !  Maximum distance from source node
        integer                                         ::  iroute   !  
        logical                                         ::  fsymm    !
@@ -121,18 +125,17 @@
 ! Reading command line options
 !
        call command_line(inp,ref,intop,topout,qmout,knei,iroute,       &
-                         formt,meth,basis,disp,chrg,mult,resname,      &
-                         fsymm,flj,fexcl,debug)
+                         formt,meth,basis,disp,chrg,mult,sysname,      &
+                         resname,nmol,fsig,feps,fsymm,flj,fexcl,debug)
 !
 ! Defaults
 !
       top%def%nbfunc  = 1
       top%def%comrule = 2
-      top%def%genpair = 'yes'
+      top%def%genpair = 'no'
       top%def%fudgelj = 0.5d0
       top%def%fudgeqq = 0.5d0/0.6d0
 !
-      top%mol%resname = resname
       top%mol%nrexcl  = 3
 !
 ! Printing summary of the input information
@@ -187,6 +190,7 @@
 !
        end if
 !
+       topout  = trim(topbas)//'.top'
        topnb   = trim(topbas)//'_nb.top'
        topcorr = trim(topbas)//'_template.top'
 ! 
@@ -227,6 +231,9 @@
        if ( len_trim(intop) .gt. 0 ) then
 !
          call read_top(reftop,itype,intop,uniinp)
+!
+         reftop%attype%sig(:) = reftop%attype%sig(:)*fsig
+         reftop%attype%eps(:) = reftop%attype%eps(:)*feps
 !
          nat = reftop%nat       
 !
@@ -473,9 +480,49 @@
                 top%atom%atnr(nat),top%atom%resnr(nat),                &
                 top%atom%itype(nat))
 !
+! If input topology is specified take information from there 
+!  (command line options have priority)
+!
        if ( len_trim(intop) .gt. 0 ) then
-         top%def = reftop%def
-         top%mol = reftop%mol
+!
+         top%def = reftop%def ! Defaults already specified
+         top%mol = reftop%mol ! Exclusions already specified (TODO: select exclusions)
+!
+         if ( trim(resname) .eq. '[no]' ) then
+           top%mol%resname = reftop%mol%resname
+           resname         = reftop%mol%resname
+         else
+           top%mol%resname = resname
+         end if
+!
+         if ( trim(sysname) .eq. '[none]' ) then
+           top%mol%sysname = reftop%mol%sysname
+         else 
+           top%mol%sysname = sysname
+         end if
+!
+         if ( nmol .eq. -1 ) then
+           top%mol%nmol = reftop%mol%nmol
+         else 
+           top%mol%nmol = nmol
+         end if
+!
+       else
+!
+         if ( trim(resname) .eq. '[no]' ) then
+           top%mol%resname = 'MOL'
+           resname         = 'MOL'
+         end if
+!
+         top%mol%sysname = trim(resname)//'_newFF'
+!
+         if ( nmol .eq. -1 ) then
+           top%mol%nmol = 1
+           nmol         = 1
+         else 
+           top%mol%nmol = nmol
+         end if
+!
        end if
 !
 ! Generating new atomtypes section
@@ -528,9 +575,6 @@
        if ( len_trim(intop) .gt. 0 ) then
          top%atom = reftop%atom
        else
-!
-         top%mol%resname = resname
-!
          do i = 1, nat
            top%atom%residue(i) = top%mol%resname
            top%atom%atom(i)    = lab(i)
@@ -772,7 +816,8 @@
 !
        subroutine command_line(inp,ref,top,topout,qmout,knei,iroute,   &
                                formt,meth,basis,disp,chrg,mult,        & 
-                               resname,fsymm,flj,fexcl,debug)
+                               sysname,resname,nmol,fsig,feps,fsymm,   &
+                               flj,fexcl,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -788,7 +833,11 @@
        character(len=leninp),intent(out)  ::  qmout    !  QC input file name
        character(len=leninp),intent(out)  ::  ref      !  Reference xyz file name
        character(len=lentag),intent(out)  ::  formt    !
+       character(len=lenarg),intent(out)  ::  sysname  !
        character(len=lenlab),intent(out)  ::  resname  !
+       real(kind=8),intent(out)           ::  fsig     !
+       real(kind=8),intent(out)           ::  feps     !
+       integer,intent(out)                ::  nmol     !  
        integer,intent(out)                ::  knei     !  
        integer,intent(out)                ::  iroute   !  
        logical,intent(out)                ::  fsymm    !  
@@ -820,7 +869,9 @@
        topout = ''
        qmout  = ''
 !
-       resname = 'MOL'
+       sysname = '[none]'
+       resname = '[no]'
+       nmol    = -1
 !
        formt  = 'gaussian'
        knei   = -1
@@ -831,6 +882,9 @@
        disp  = 'GD3BJ'
        chrg  = 0
        mult  = 1
+!
+       fsig = 1.0
+       feps = 1.0
 !
        fsymm = .TRUE.
        flj   = .FALSE.
@@ -878,9 +932,19 @@
              call check_arg(qmout,io,arg,cmd)
              i = i + 1
 !
-           case ('-name','-resname','--resname')
+           case ('-residue','-name','-resname','--resname','--residue-name')
              call get_command_argument(i,resname,status=io)
              call check_arg(resname,io,arg,cmd)
+             i = i + 1
+!
+           case ('-nmol','-nmols','--number-molecules')
+             call get_command_argument(i,next,status=io)
+             read(next,*) nmol
+             i = i + 1
+!
+           case ('-sys','-system','-sysname','--system','--sysname','--system-name')
+             call get_command_argument(i,sysname,status=io)
+             call check_arg(sysname,io,arg,cmd)
              i = i + 1
 !
            case ('-fmt','--format')
@@ -946,6 +1010,16 @@
            case ('-mult','-multi','--multi','--multiplicity')
              call get_command_argument(i,next,status=io)
              read(next,*) mult
+             i = i + 1
+!
+           case ('-fsig','-fsigma','--factor-sig','--factor-sigma')
+             call get_command_argument(i,next,status=io)
+             read(next,*) fsig
+             i = i + 1
+!
+           case ('-feps','-fepsilon','--factor-eps','--factor-epsilon')
+             call get_command_argument(i,next,status=io)
+             read(next,*) feps
              i = i + 1
 !
            case ('-s','-sym','-symm','--symmetrize','--symm','--sym')

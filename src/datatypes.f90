@@ -1,6 +1,9 @@
 !======================================================================!
 !
        module datatypes
+! 
+       use lengths
+!
        implicit none
 !
        type groinp
@@ -52,8 +55,10 @@
        end type groatoms
 !
        type gromolecule
-         character(len=5)                           ::  resname
+         character(len=lenarg)                      ::  sysname  !
+         character(len=lenlab)                      ::  resname  !
          integer                                    ::  nrexcl   !  Exclusions of nb interactions
+         integer                                    ::  nmol     ! 
        end type gromolecule
 !
        type grobonded

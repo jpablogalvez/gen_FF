@@ -36,17 +36,18 @@
 !
 ! Input/output variables
 !
-       type(grotop),intent(out)                      ::  top     !
-       character(len=leninp),intent(in)              ::  intop   !
-       integer,intent(in)                            ::  unitop  !
-       integer,dimension(:),allocatable,intent(out)  ::  itype   !
+       type(grotop),intent(out)                      ::  top      !
+       character(len=leninp),intent(in)              ::  intop    !
+       integer,intent(in)                            ::  unitop   !
+       integer,dimension(:),allocatable,intent(out)  ::  itype    !
 !
 ! Local variables
 !
-       character(len=lenline)                        ::  line    !  Line read
-       integer                                       ::  nstr    !
-       integer                                       ::  io      !
-       integer                                       ::  i       !
+       character(len=lenline)                        ::  line     !  Line read
+       character(len=lenlab)                         ::  resname  !
+       integer                                       ::  nstr     !
+       integer                                       ::  io       !
+       integer                                       ::  i        !
 !
 ! Reading Gromacs topology information
 ! ------------------------------------
@@ -245,6 +246,51 @@
          top%atom%itype(i) = io
 !
        end do
+!
+       rewind(unitop)
+!
+! Reading system section
+! 
+       call find_key(unitop,'[ system ]',line,io)
+       if ( io .ne. 0 ) call print_badread(intop,'[ system ]')
+!
+       do
+         read(unitop,'(A)',iostat=io) line
+         if ( io /= 0 ) exit
+         if ( len_trim(line) .eq. 0 ) cycle
+         line = adjustl(line)
+         if ( (line(1:1).ne.';') .and. (line(1:1).ne.'#') ) exit ! Find first no blank line with no comments
+       end do
+!
+       read(line,*) top%mol%sysname
+!
+! Reading molecules section
+! 
+       call find_key(unitop,'[ molecules ]',line,io)
+       if ( io .ne. 0 ) call print_badread(intop,'[ molecules ]')
+!
+       do
+         read(unitop,'(A)',iostat=io) line
+         if ( io /= 0 ) exit
+         if ( len_trim(line) .eq. 0 ) cycle
+         line = adjustl(line)
+         if ( (line(1:1).ne.';') .and. (line(1:1).ne.'#') ) exit ! Find first no blank line with no comments
+       end do
+!
+       read(line,*) resname,top%mol%nmol
+!
+       if ( trim(top%mol%resname) .ne. trim(resname) ) then
+         write(*,*)
+         write(*,'(2X,68("="))')
+         write(*,'(3X,A)') 'ERROR:  Residue name mismatch in input topology'
+         write(*,*)
+         write(*,'(3X,A)') 'Residue name specified after [ moleculetype ] :',trim(top%mol%resname)
+         write(*,'(3X,A)') 'Residue name specified after [ molecules ]    :',trim(resname)
+         write(*,*)
+         write(*,'(2X,68("="))')
+         write(*,*)  
+         call print_end()
+       end if
 !
        close(unitop)
 !
@@ -644,7 +690,7 @@
 !
 ! Printing topology file tail
 !
-       call print_tail(uni,top%mol%resname)
+       call print_tail(uni,top%mol%sysname,top%mol%resname,top%mol%nmol)
 !
        close(uni)
 !
@@ -876,25 +922,27 @@
 !
 !======================================================================!
 !
-       subroutine print_tail(uni,resname)
+       subroutine print_tail(uni,sysname,resname,nmol)
 !
        implicit none
 !
 ! Input/output variables
 !
        integer,intent(in)                ::  uni      !
+       integer,intent(in)                ::  nmol     !
+       character(len=lenarg),intent(in)  ::  sysname  !
        character(len=lenlab),intent(in)  ::  resname  !
 !
 ! Printing Gromacs topology tail
 ! ------------------------------
 !
        write(uni,'(A)') '[ system ]'
-       write(uni,'(1X,A)') trim(resname)//'_newFF'
+       write(uni,'(1X,A)') trim(sysname)
        write(uni,*)
 !
        write(uni,'(A)') '[ molecules ]'
        write(uni,'(A)') '; Compound        nmols'
-       write(uni,'(1X,A,7X,I6)') resname,1
+       write(uni,'(1X,A,7X,I6)') resname,nmol
        write(uni,*)
 !
        return
