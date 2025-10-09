@@ -313,7 +313,7 @@
 !
 !  If reference geometry is provided extract atomic positions and labels
 !
-       geo = qmout
+       geo = qmout ! TODO: trace back if equilibrium geometry is from external final, QM output or GMX topology
 !
        if ( len_trim(ref) .ne. 0 ) then
          geo = ref
@@ -923,7 +923,8 @@
              i = i + 1
 !
            case ('-t','-top','--top','-topout','-outtop','--topout',   &
-                 '--outtop','--topology','--output-topology')
+                 '--outtop','--topology','--output-topology',          &
+                 '-out','--output')
              call get_command_argument(i,topout,status=io)
              call check_arg(topout,io,arg,cmd)
              i = i + 1

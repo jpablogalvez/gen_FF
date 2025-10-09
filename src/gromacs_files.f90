@@ -860,6 +860,7 @@
 !
 ! Local variables
 !
+       character(len=leninp)             ::  topname  !
        integer                           ::  i        !
 !
 ! Printing Gromacs topology header
@@ -867,10 +868,16 @@
 !
 ! Printing title
 !
-       write(uni,'(A)') '; Topology generated from '//trim(top)
+       if ( len_trim(intop) .eq. 0 )  then
+         topname = 'scratch'
+       else
+         topname = intop
+       end if
+!
+       write(uni,'(A)') '; Topology generated from '//trim(topname)
        write(uni,'(A)') '; Equilibrium coordinates taken from '//      &
                                                                trim(geo)
-       write(uni,'(A)') '; '//trim(outp)//' created by atomtypes at '  &
+       write(uni,'(A)') '; '//trim(topout)//' created by atomtypes at '&
                                          //fdate()//' on '//print_host()
        write(uni,*)
 !
