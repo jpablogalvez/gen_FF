@@ -929,7 +929,7 @@
 !
 ! This subroutine 
 !
-       subroutine symffbonded(nat,nidat,idat,bonded,dihed,debug)
+       subroutine symffbonded(nat,nidat,idat,bonded,dihed,fsymm,debug)
 !
        use datatypes,   only: grobonded,                               &
                               dihedrals
@@ -946,6 +946,7 @@
        integer,intent(in)                           ::  nat       ! 
        integer,intent(in)                           ::  nidat     ! 
 !
+       logical,intent(in)                           ::  fsymm     !
        logical,intent(in)                           ::  debug     !  Debug mode
 !
 ! Local variables
@@ -973,7 +974,7 @@
        end do
 !
        call symterm(bonded%nbond,bonded%idbond,bonded%bond,            &
-                    bonded%sbond,debug)
+                    bonded%sbond,fsymm,debug)
 !
 !  Finding equivalent angle-bending terms
 !
@@ -990,7 +991,7 @@
        end do
 !
        call symterm(bonded%nang,bonded%idang,bonded%ang,bonded%sang,   &
-                    debug)
+                    fsymm,debug)
 !
 !  Finding equivalent dihedrals terms
 !
@@ -1092,19 +1093,19 @@
 !
 ! FIXME: problem symmetrizing -179 and 179 dihedrals
        if ( dihed%nimpro .gt. 0 ) then
-         call symdihe(dihed%nimpro,dihed%idimpro,dihed%dimpro,dihed%simpro,.TRUE.,debug)
+         call symdihe(dihed%nimpro,dihed%idimpro,dihed%dimpro,dihed%simpro,.TRUE.,fsymm,debug)
        end if 
 !
        if ( dihed%ninv .gt. 0 ) then
-         call symdihe(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,.TRUE.,debug)
+         call symdihe(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,.TRUE.,fsymm,debug)
        end if 
 !
        if ( dihed%nrigid .gt. 0 ) then
-         call symdihe(dihed%nrigid,dihed%idrigid,dihed%drigid,dihed%srigid,.TRUE.,debug)
+         call symdihe(dihed%nrigid,dihed%idrigid,dihed%drigid,dihed%srigid,.TRUE.,fsymm,debug)
        end if 
 !
        if ( dihed%nflexi .gt. 0 ) then
-         call symdihe(dihed%nflexi,dihed%idflexi,dihed%dflexi,dihed%sflexi,.FALSE.,debug)
+         call symdihe(dihed%nflexi,dihed%idflexi,dihed%dflexi,dihed%sflexi,.FALSE.,fsymm,debug)
        end if
 !
        deallocate(ivaux)
@@ -1624,15 +1625,16 @@
 !
        do i = 1, dihed%nflexi
 !         
-         dihed%flexi(i)%ntor = 6 ! TODO: choose number of functions in Fourier expansion
+         dihed%flexi(i)%ntor = 7 ! TODO: choose number of functions in Fourier expansion
          allocate(dihed%flexi(i)%tor(dihed%flexi(i)%ntor)) 
 !
          dihed%flexi(i)%itor(:) = dihed%iflexi(:,i)
+         dihed%fflexi(i)        = 9
 !
          do j = 1, dihed%flexi(i)%ntor
            dihed%flexi(i)%tor(j)%vtor  = 0.0d0
            dihed%flexi(i)%tor(j)%phase = dihed%dflexi(i) ! TODO: shift phase for even multiplicities
-           dihed%flexi(i)%tor(j)%multi = j
+           dihed%flexi(i)%tor(j)%multi = j-1
          end do
 !
        end do
@@ -1893,7 +1895,7 @@
 !
 ! This subroutine 
 !
-       subroutine symterm(nbond,idbond,dbond,sbond,debug)
+       subroutine symterm(nbond,idbond,dbond,sbond,fsymm,debug)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -1907,6 +1909,7 @@
        integer,dimension(nbond),intent(in)          ::  sbond   !
        integer,intent(in)                           ::  nbond   !  
        logical,intent(in)                           ::  debug   !
+       logical,intent(in)                           ::  fsymm   !
 !
 ! Equivalent atoms information
 !
@@ -1951,25 +1954,38 @@
        call blockdiag(nbond,adj,mol,tag,agg,nsize,nagg,iagg,           &
                       nmol,imol,magg)
 !
+       if ( fsymm ) then
+         do i = 2, nsize
+           k = imol(i)
+           if ( nagg(i) .ne. 0 ) then
+             do j = 1, nagg(i)
+!
+               daux = 0
+               do l = k+1, k+i
+                  daux = daux + dbond(mol(l))
+               end do
+!
+               daux = daux/real(i)
+               do l = k+1, k+i
+                 dbond(mol(l)) = daux
+               end do
+!
+               k = k + i
+!
+             end do
+           end if
+         end do
+       end if
+!
        do i = 2, nsize
          k = imol(i)
          if ( nagg(i) .ne. 0 ) then
            do j = 1, nagg(i)
 !
-             daux = 0
-             do l = k+1, k+i
-                daux = daux + dbond(mol(l))
+             do l = k+2, k+i
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)') sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0'
+               write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0'
              end do
-!
-             daux = daux/real(i)
-             do l = k+1, k+i
-               dbond(mol(l)) = daux
-             end do
-!
-!~              do l = k+2, k+i
-!~                write(unideps,'(3X,I4,1X,A,1X,I4,A)') sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0'
-!~                write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0'
-!~              end do
 !
              k = k + i
 !
@@ -2005,7 +2021,7 @@
 !
 ! This subroutine 
 !
-       subroutine symdihe(ndihe,iddihe,ddihe,sdihe,ftmp,debug)
+       subroutine symdihe(ndihe,iddihe,ddihe,sdihe,ftmp,fsymm,debug)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2019,6 +2035,7 @@
        integer,dimension(ndihe),intent(in)          ::  sdihe   !
        integer,intent(in)                           ::  ndihe   !  
        logical,intent(in)                           ::  ftmp    !  
+       logical,intent(in)                           ::  fsymm   ! 
        logical,intent(in)                           ::  debug   !
 !
 ! Equivalent atoms information
@@ -2083,10 +2100,10 @@
 !               ddihe(mol(l)) = daux
 !             end do
 !
-!~              do l = k+2, k+i
-!~                write(unideps,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0'
-!~                if ( ftmp )write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0'
-!~              end do
+             do l = k+2, k+i
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0'
+               if ( ftmp )write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0'
+             end do
 !
              k = k + i
 !

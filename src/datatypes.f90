@@ -151,6 +151,8 @@
          type(gromolecule)                          ::  mol      !  Definition of the molecule
          type(grobonded)                            ::  bonded   !  Bonded interactions
          integer                                    ::  nat      !
+         integer                                    ::  nstiff   !
+         integer                                    ::  nsoft    !
        end type grotop 
 !
        end module datatypes

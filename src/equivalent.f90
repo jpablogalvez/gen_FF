@@ -4,7 +4,7 @@
 !
        use timings
        use lengths,       only:  leninp,lentag,lenlab,lenarg
-       use units,         only:  uniinp,uniic,unideps,                 &
+       use units,         only:  uniinp,uniic,unideps,unitmp,          &
                                  unitop,uninb,unicorr
 !
        use datatypes
@@ -290,7 +290,7 @@
 !
 ! If QM output is provided then extract molecular information
 !
-!~          call chk_qmout(qmout,qmformt) ! TODO: guess qm output format
+         call chk_qmout(qmout,formt) ! TODO: read orca output
 !
          call chk_log(qmout,nat)
 !
@@ -629,11 +629,26 @@
 !
        end if
 !
+       reftop%nstiff  = top%bonded%nbond +                             &
+                        top%bonded%nang +                              &
+                        dihe%nimpro + dihe%ninv + dihe%nrigid
+       reftop%nsoft   = dihe%nflexi
+!
+!
 ! Symmetrizing force field terms
 ! ------------------------------
 !
-       if ( fsymm ) call symffbonded(nat,nidat,idat,top%bonded,dihe,   &
-                                     debug)
+       open(unit=unideps,file=trim(bas)//'_suggdeps.txt',action='write')
+       open(unit=unitmp,status='scratch')
+!
+       write(unideps,'(A)') '$dependence 1.2'
+!
+       call symffbonded(nat,nidat,idat,top%bonded,dihe,                &
+                        fsymm,debug)
+!
+       write(unideps,'(A)') '$end'
+!
+       close(unideps)
 !
 ! Printing force field
 ! --------------------
@@ -644,9 +659,8 @@
 ! Printing JOYCE input files
 ! --------------------------
 !
-!~        call print_deps
 !~        call print_ic
-!~        call print_step1
+       call print_step1(bas,topout,reftop%nstiff,fpairs)
 !
 ! Printing summary of the input information
 !
@@ -775,6 +789,11 @@
          end if
 !
        end if
+!
+! Closing files
+!
+       close(unideps)
+       close(unitmp)
 !
 ! Deallocating local variables
 !
@@ -1357,5 +1376,64 @@
 !
        return
        end subroutine chk_qmout
+!
+!======================================================================!
+!
+! GENINP - GENerate INPut
+!
+! This subroutine 
+!
+       subroutine print_step1(bas,top,nstiff,fpairs)
+!
+       use lengths,  only: leninp,lenline
+       use units,    only: unijoyce,unitmp
+!
+       implicit none
+!
+! Input/output variables
+!
+       character(len=leninp),intent(in)          ::  bas     !
+       character(len=leninp),intent(in)          ::  top     !
+       integer,intent(in)                        ::  nstiff  !
+       logical,intent(in)                        ::  fpairs  !
+!
+! Local variables
+!
+       character(len=lenline)                    ::  line    !
+       integer                                   ::  io      !
+!
+! Generating Joyce3 input (step1) 
+! -------------------------------
+!
+       open(unit=unijoyce,file='joyce.'//trim(bas)//'.step1.inp',      &
+            action='write')
+!
+       write(unijoyce,'(A)') '$title Target - Step 1'
+       write(unijoyce,'(A)') '$equil ../qm_data/'//trim(bas)//'.fcc'
+       write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
+       write(unijoyce,'(A)') '$zero 1.d-12'
+       write(unijoyce,'(A)') '$whess 5000. 2500.0'
+       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
+       if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
+       write(unijoyce,*) 
+       write(unijoyce,'(A)') '$dependence 1.2'
+!
+       rewind(unitmp)
+       do
+         read(unitmp,'(A)',iostat=io) line
+         if ( io /= 0 ) exit
+         write(unijoyce,'(A)') trim(line)
+       end do
+!
+! Closing output files
+! --------------------
+!
+       write(unijoyce,'(A)') '$end'
+       write(unijoyce,*)
+!
+       close(unijoyce)
+!
+       return
+       end subroutine print_step1
 !
 !======================================================================!
