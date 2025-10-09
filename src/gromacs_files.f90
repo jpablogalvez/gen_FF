@@ -834,7 +834,7 @@
 !
 !======================================================================!
 !
-       subroutine print_head(uni,top,outp,geo,def,attype,mol,atom)
+       subroutine print_head(uni,outp,top,geo,def,attype,mol,atom)
 !
        use datatypes, only: grodefaults,                               &
                             groattype,                                 &
@@ -868,13 +868,11 @@
 !
 ! Printing title
 !
-       if ( len_trim(intop) .eq. 0 )  then
-         topname = 'scratch'
+       if ( len_trim(top) .eq. 0 ) then
+         write(uni,'(A)') '; Topology generated from scratch'
        else
-         topname = intop
+         write(uni,'(A)') '; Topology generated from '//trim(top)
        end if
-!
-       write(uni,'(A)') '; Topology generated from '//trim(topname)
        write(uni,'(A)') '; Equilibrium coordinates taken from '//      &
                                                                trim(geo)
        write(uni,'(A)') '; '//trim(topout)//' created by atomtypes at '&
