@@ -65,14 +65,23 @@
        real(kind=8),dimension(:,:),allocatable         ::  wiberg   !  Wiberg bond index matrix
        integer,dimension(:,:),allocatable              ::  mindis   !  Minimum distance matrix
        integer,dimension(:,:),allocatable              ::  cycles   !  Cycles information
+       integer,dimension(:,:),allocatable              ::  aroma    !  Aromatic cycles information
+       integer,dimension(:,:),allocatable              ::  arunit   !  Aromatic units information
        integer,dimension(:),allocatable                ::  ncycle   !  Number of atoms in each cycle
+       integer,dimension(:),allocatable                ::  naroma   !  Number of atoms in each aromatic cycle
+       integer,dimension(:),allocatable                ::  narunit  !  Number of atoms in each aromatic unit
        integer,dimension(:),allocatable                ::  ideg     !  
        integer                                         ::  mcycle   !  Number of cycles
+       integer                                         ::  maroma   !  Number of aromatic cycles
+       integer                                         ::  marunit  !  Number of aromatic units
        integer                                         ::  rank     !  Maximum number of cycles
        integer                                         ::  nedge    !  Number of edges (bonds)
        logical,dimension(:,:),allocatable              ::  adj      !  Boolean adjacency matrix
        logical,dimension(:,:),allocatable              ::  lcycle   !  Bonds belonging to rings
        logical,dimension(:,:),allocatable              ::  lrigid   !  Double/triple bonds       
+       logical,dimension(:,:),allocatable              ::  laroma   !  Double/triple bonds       
+       logical,dimension(:),allocatable                ::  lheavy   !  Heavy atom       
+       logical,dimension(:),allocatable                ::  latar    !  Aromatic atom       
 ! 
 ! Topology information
 !
@@ -303,7 +312,8 @@
 ! Allocating memory
 !
          allocate(wiberg(nat,nat))
-         allocate(lcycle(nat,nat),lrigid(nat,nat))
+         allocate(lcycle(nat,nat),lrigid(nat,nat),laroma(nat,nat))
+         allocate(lheavy(nat),latar(nat))
 !
 !  Reading Wiberg bond index matrix  ! TODO: only supports gaussian QC output
 !
@@ -350,9 +360,10 @@
 !
          call bonds2adj(reftop%bonded%nbond,reftop%bonded%ibond,nat,adj)
 !
-         allocate(lab(nat))
+         allocate(lab(nat),mass(nat))
 !
-         lab(:) = reftop%atom%attype(:)
+         lab(:)  = reftop%atom%attype(:)
+         mass(:) = reftop%atom%mass(:)
 !
        else
 !
@@ -364,6 +375,8 @@
 !
 ! Computing graph properties
 ! -------------------------- 
+!
+       call genheavylist(nat,mass,lheavy)
 !
 !   Computing degrees
 !
@@ -380,6 +393,8 @@
        rank = nedge - nat + 1 
 !
        allocate(cycles(rank,nat),ncycle(rank)) 
+       allocate(aroma(rank,nat),naroma(rank)) 
+       allocate(arunit(rank,nat),narunit(rank)) 
 !
 !  Cycles identification
 !
@@ -388,6 +403,7 @@
        if ( debug ) then
          write(*,*) 'Cycle information'
          write(*,*) '-----------------'
+         write(*,*) ' Graph rank',rank
          write(*,*) ' Number of cycles',mcycle
          do i = 1, mcycle
            write(*,*) 'Cycle Number', i, ':',(cycles(i,j),j=1,ncycle(i))
@@ -428,7 +444,31 @@
 !
 !  Generating rigidlist with rigid bonds
 !
-         call genrigidlist(nat,wiberg,lcycle,lrigid)   
+         call genrigidlist(nat,wiberg,lcycle,lrigid,laroma,latar)  
+!
+! Generating representation of aromatic cycles
+!
+         call findarcycles(nat,rank,latar,mcycle,ncycle,cycles,        &
+                           maroma,naroma,aroma,marunit,narunit,arunit)
+!
+         if ( debug ) then
+           write(*,*) 'Aromatic cycles information'
+           write(*,*) '---------------------------'
+           write(*,*) ' Number of aromatic cycles',maroma
+           do i = 1, maroma
+             write(*,*) 'Aromatic cycle Number', i, ':',               &
+                                              (aroma(i,j),j=1,naroma(i))
+           end do
+           write(*,*)
+           write(*,*) 'Aromatic units information'
+           write(*,*) '---------------------------'
+           write(*,*) ' Number of aromatic units',marunit
+           do i = 1, marunit
+             write(*,*) 'Aromatic cycle Number', i, ':',               &
+                                            (arunit(i,j),j=1,narunit(i))
+           end do
+           write(*,*)
+          end if
 !
        end if
 !

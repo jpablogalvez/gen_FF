@@ -875,7 +875,7 @@
        end if
        write(uni,'(A)') '; Equilibrium coordinates taken from '//      &
                                                                trim(geo)
-       write(uni,'(A)') '; '//trim(topout)//' created by atomtypes at '&
+       write(uni,'(A)') '; '//trim(outp)//' created by atomtypes at '  &
                                          //fdate()//' on '//print_host()
        write(uni,*)
 !

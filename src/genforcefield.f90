@@ -16,6 +16,8 @@
                    nearnei,                                            &
                    genrigidlist,                                       &
                    gencyclelist,                                       &
+                   genheavylist,                                       &
+                   findarcycles,                                       &
                    bonded2dihe
 !
        contains
@@ -901,6 +903,7 @@
        allocate(dihed%iflexi(4,ndihe),dihed%dflexi(ndihe),             &
                 dihed%kflexi(ndihe),dihed%flexi(ndihe),dihed%fflexi(ndihe))
        dihed%iflexi(:,:) = 0
+       dihed%fflexi(:)   = 0
        dihed%dflexi(:)   = 0.0d0
        dihed%kflexi(:)   = 0.0d0
        dihed%nflexi      = 0
@@ -1173,7 +1176,7 @@
 !
 ! This subroutine 
 !
-       subroutine genrigidlist(nat,wiberg,lcycle,lrigid)   
+       subroutine genrigidlist(nat,wiberg,lcycle,lrigid,laroma,latar)   
 !
        implicit none
 !
@@ -1182,6 +1185,8 @@
        real(kind=8),dimension(nat,nat),intent(in)  ::  wiberg  !
        logical,dimension(nat,nat),intent(in)       ::  lcycle  !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(out)      ::  lrigid  !  Rigid bonds
+       logical,dimension(nat,nat),intent(out)      ::  laroma  !  Rigid bonds
+       logical,dimension(nat),intent(out)          ::  latar   !  Aromatic atom
        integer,intent(in)                          ::  nat     !  Number of nodes
 !
 ! Local variables
@@ -1193,6 +1198,8 @@
 ! --------------------------------------------------------
 !
        lrigid(:,:) = .FALSE.  ! TODO: check if all dihedrals within atoms forming a cycle are planar
+       laroma(:,:) = .FALSE.
+       latar(:)    = .FALSE.
 !
 ! We consider rigid bond 
 !  if Wiberg index is greater than 1.5 it is a double bond
@@ -1202,10 +1209,18 @@
        do i = 1, nat-1
          do j = i+1, nat
 !
-           if ( (wiberg(j,i).ge.1.5d0) .or.                            &
-                         ((wiberg(j,i).ge.1.1d0).and.lcycle(j,i)) ) then 
+           if ( wiberg(j,i) .ge. 1.5d0 ) then
              lrigid(i,j) = .TRUE.
              lrigid(j,i) = .TRUE.
+           else if ( (wiberg(j,i).ge.1.1d0).and.lcycle(j,i) ) then 
+             lrigid(i,j) = .TRUE.
+             lrigid(j,i) = .TRUE.
+!
+             laroma(i,j) = .TRUE.
+             laroma(j,i) = .TRUE.
+!
+             latar(i) = .TRUE.
+             latar(j) = .TRUE.
            end if
 !
          end do
@@ -1213,6 +1228,211 @@
 !
        return
        end subroutine genrigidlist
+!
+!======================================================================!
+!
+! GENHEAVYLIST - GENerate HEAVY LIST
+!
+! This subroutine 
+!
+       subroutine genheavylist(nat,mass,lheavy)
+!
+       implicit none
+!
+! Input/output variables
+!
+       logical,dimension(nat),intent(out)              ::  lheavy   !  Adjacency matrix
+       real(kind=8),dimension(nat),intent(in)          ::  mass     !  Atomic masses
+       integer,intent(in)                              ::  nat      !  Number of nodes
+!
+! Local variables
+!
+       integer                                         ::  i,j      !  Index
+!
+! Building H-deplected adjacency matrix
+!
+       lheavy(:) = .FALSE.
+!
+       do i = 1, nat
+         if ( mass(i) .gt. 3.5 ) lheavy = .TRUE.
+       end do
+!
+       return
+       end subroutine genheavylist
+!
+!======================================================================!
+!
+! FINDARCYCLES - FIND ARomatic CYCLES
+!
+! This subroutine 
+!
+       subroutine findarcycles(nat,r,latar,mcycle,ncycle,cycles,       &
+                               maroma,naroma,aroma,marunit,narunit,    &
+                               arunit)
+!
+       implicit none
+!
+! Input/output variables
+!
+       logical,dimension(nat),intent(in)       ::  latar    !  Atoms belonging to aromatic rings
+       integer,dimension(r,nat),intent(in)     ::  cycles   !  Cycles information
+       integer,dimension(r,nat),intent(out)    ::  aroma    !  Aromatic cycles information
+       integer,dimension(r,nat),intent(out)    ::  arunit   !  Aromatic units information
+       integer,dimension(r),intent(in)         ::  ncycle   !  Number of atoms in each cycle
+       integer,dimension(r),intent(out)        ::  naroma   !  Number of atoms in each aromatic cycle
+       integer,dimension(r),intent(out)        ::  narunit  !  Number of atoms in each aromatic unit
+       integer,intent(in)                      ::  mcycle   !  Number of cycles
+       integer,intent(out)                     ::  maroma   !  Number of aromatic cycles
+       integer,intent(out)                     ::  marunit  !  Number of aromatic units
+       integer,intent(in)                      ::  nat      !  Number of nodes
+       integer,intent(in)                      ::  r        !  Cyclic rank
+!
+! Local variables
+! 
+       logical,dimension(nat,nat)              ::  lblist   !
+       logical,dimension(mcycle)               ::  notvis   !
+       logical                                 ::  lcheck   !
+       logical                                 ::  lnew     !
+       integer,dimension(mcycle)               ::  queue    !
+       integer                                 ::  iqueue   !
+       integer                                 ::  nqueue   !
+       integer                                 ::  i,j,k    !
+       integer                                 ::  ii,jj    !
+!
+! Generating array representation of aromatic cycles
+! --------------------------------------------------
+!
+       maroma = 0
+!
+       naroma(:)  = -1
+       aroma(:,:) = -1
+!
+       do i = 1, mcycle
+!
+         lcheck = .TRUE.    
+!
+         do j = 1, ncycle(i)
+           if ( .NOT. latar(cycles(i,j)) ) then
+             lcheck = .FALSE.
+             exit
+           end if
+         end do
+!
+         if ( lcheck ) then
+!
+           maroma = maroma + 1
+!
+           naroma(maroma)  = ncycle(i)
+           aroma(maroma,:) = cycles(i,:)    
+!
+         end if
+!
+       end do
+!
+! Generating array representation of aromatic units
+! -------------------------------------------------
+!
+       marunit = 0
+!
+       narunit(:)  = -1
+       arunit(:,:) = -1
+!
+       notvis(:) = .TRUE.
+!
+! Outer loop over every node
+!
+       do i = 1, maroma
+         if ( notvis(i) ) then
+!
+           notvis(i) = .FALSE.
+! Initializing aromatic units information
+           marunit = marunit + 1
+!
+           narunit(marunit)  = naroma(i)
+           arunit(marunit,:) = cycles(i,:)
+! Initializing queue
+           queue(:) = 0
+           queue(1) = i
+           iqueue   = 1  ! actual position in the queue
+           nqueue   = 2  ! next position in the queue
+!
+           lblist(:,:) = .FALSE.
+!
+! Inner loop over queue elements
+!
+           do while ( iqueue .lt. nqueue )
+!
+             k = queue(iqueue)
+!
+! Adding edges in queue cycle to blacklist  
+!
+             do ii = 1, naroma(k)
+               if ( ii .lt. naroma(k) ) then
+                 jj = ii + 1
+               else
+                 jj = 1
+               end if
+               lblist(aroma(k,ii),aroma(k,jj)) = .TRUE.
+               lblist(aroma(k,jj),aroma(k,ii)) = .TRUE.
+             end do
+!
+! Checking if rest of cycles share a common edge
+!
+             do j = i+1, maroma
+               if ( notvis(j) ) then
+!
+                 lcheck = .FALSE.
+!
+                 do ii = 1, naroma(j)
+                   if ( ii .lt. naroma(j) ) then
+                     jj = ii + 1
+                   else
+                     jj = 1
+                   end if
+                   if ( lblist(aroma(j,ii),aroma(j,jj)) ) then
+                     lcheck = .TRUE.
+                     exit
+                   end if
+                 end do
+!
+                 if ( lcheck ) then
+!
+! Updating queue
+!
+                   notvis(j)     = .FALSE.
+                   queue(nqueue) = j
+                   nqueue        = nqueue + 1
+!
+! Updating aromatic units information
+!
+                   do jj = 1, naroma(j)
+                     lnew = .TRUE.
+                     do ii = 1, narunit(marunit)
+                       if ( arunit(marunit,ii) .eq. aroma(j,jj) ) then                       
+                         lnew = .FALSE.
+                         exit
+                       end if
+                     end do
+                     if ( lnew ) then
+                       narunit(marunit) = narunit(marunit) + 1
+                       arunit(marunit,narunit(marunit)) = aroma(j,jj)
+                     end if
+                   end do
+!
+                 end if
+!
+               end if
+             end do
+!
+             iqueue = iqueue + 1
+!
+           end do
+!
+         end if
+       end do
+!
+       return
+       end subroutine findarcycles
 !
 !======================================================================!
 !
