@@ -676,8 +676,8 @@
 ! Printing bonded terms
 !
        call print_bond(uni,topout,top%bonded)
-       if ( top%bonded%nang .gt. 1 ) call print_angle(uni,topout,top%bonded)
-       if ( dihe%ndihe .gt. 1 ) call print_dihe(uni,topout,dihe)
+       if ( top%bonded%nang .ge. 1 ) call print_angle(uni,topout,top%bonded)
+       if ( dihe%ndihe .ge. 1 ) call print_dihe(uni,topout,dihe)
 !
 ! Printing pairs section
 !
