@@ -72,7 +72,7 @@
 !
 ! Building adjacency matrix according to Wiberg bond indexes
 !
-       thr = 0.5d0
+       thr = 0.75d0
 !
        adj(:,:) = .FALSE.
 !

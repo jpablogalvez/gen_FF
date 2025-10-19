@@ -1796,7 +1796,7 @@
 !
        nimpro = 0
        do i = 1, dihed%nimpro
-         flag = .TRUE.
+         flag = .FALSE.
          do j = 1, nimpro
            if ( dihed%iimpro(1,i) .eq. iimpro(1,j) ) then
              flag = .TRUE.
@@ -1815,9 +1815,9 @@
        end do
 !
        dihed%nimpro      = nimpro
-       dihed%iimpro(:,:) = iimpro
-       dihed%dimpro(:)   = dimpro
-       dihed%fimpro(:)   = fimpro
+       dihed%iimpro(:,:) = iimpro(:,:)
+       dihed%dimpro(:)   = dimpro(:)
+       dihed%fimpro(:)   = fimpro(:)
 !
 ! Keep only one inversion dihedral per central atom
 !
@@ -1842,9 +1842,9 @@
        end do
 !
        dihed%ninv      = ninv
-       dihed%iinv(:,:) = iinv
-       dihed%dinv(:)   = dinv
-       dihed%finv(:)   = finv
+       dihed%iinv(:,:) = iinv(:,:)
+       dihed%dinv(:)   = dinv(:)
+       dihed%finv(:)   = finv(:)
 !
 !  Finding torsional dihedrals
 !  ...........................
@@ -1978,6 +1978,8 @@
          end do
 !
        end do
+!
+       dihed%ndihe = dihed%nimpro + dihed%ninv + dihed%nrigid + dihed%nflexi
 !
        return
        end subroutine setdihe
