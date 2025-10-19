@@ -723,9 +723,9 @@
 !
        do i = 1, bonded%nbond
          if ( bonded%fbond(i) .eq. 1 ) then
-           write(uni,'(2X,3(1X,I3),2(3X,F12.4),12X,A,2X,I4)')           &
+           write(uni,'(2X,3(1X,I3),2(3X,F12.4),12X,A,2X,I4,1X,A)')     &
                       bonded%ibond(:,i),bonded%fbond(i),               & 
-                      bonded%bond(i),bonded%kbond(i)!,';',bonded%sbond(i)
+                      bonded%bond(i),bonded%kbond(i),';',bonded%sbond(i),trim(bonded%labbond(i))
          else if ( bonded%fbond(i) .eq. 5 ) then
            write(uni,'(2X,3(1X,I3))') bonded%ibond(:,i),bonded%fbond(i)
          end if
@@ -760,9 +760,9 @@
        write(uni,'(A)') '[ angles ]'
 !
        do i = 1, bonded%nang    
-         write(uni,'(2X,4(1X,I3),2(3X,F9.4),5X,A,2X,I4)')              &
+         write(uni,'(2X,4(1X,I3),2(3X,F9.4),5X,A,2X,I4,1X,A)')         &
                          bonded%iang(:,i),bonded%fang(i),              &
-                         bonded%ang(i),bonded%kang(i)!,';',bonded%sang(i)
+                         bonded%ang(i),bonded%kang(i),';',bonded%sang(i),trim(bonded%labang(i))
        end do
        write(uni,*)
 !
@@ -793,37 +793,37 @@
        write(uni,'(A)') '; Torsions'
        write(uni,'(A)') '[ dihedrals ]'
 !
+       if ( dihe%nrigid .gt. 0 ) then
+         do i = 1, dihe%nrigid    
+            write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4,1X,A)')      &
+                      dihe%irigid(:,i),dihe%frigid(i),dihe%drigid(i),  &
+                                       dihe%krigid(i),';',dihe%srigid(i),trim(dihe%labrigid(i))
+         end do
+       end if
+!
        if ( dihe%nimpro .gt. 0 ) then
          do i = 1, dihe%nimpro    
-            write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4)')           &
+            write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4,1X,A)')      &
                 dihe%iimpro(:,i),dihe%fimpro(i),dihe%dimpro(i),        &
-                                       dihe%kimpro(i)!,';',dihe%simpro(i)
+                                       dihe%kimpro(i),';',dihe%simpro(i),trim(dihe%labimpro(i))
          end do
        end if
 !
        if ( dihe%ninv .gt. 0 ) then
          do i = 1, dihe%ninv    
-            write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4)')           &
+            write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4,1X,A)')      &
                       dihe%iinv(:,i),dihe%finv(i),dihe%dinv(i),        &
-                                           dihe%kinv(i)!,';',dihe%sinv(i)
-         end do
-       end if
-!
-       if ( dihe%nrigid .gt. 0 ) then
-         do i = 1, dihe%nrigid    
-            write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4)')           &
-                      dihe%irigid(:,i),dihe%frigid(i),dihe%drigid(i),  &
-                                       dihe%krigid(i)!,';',dihe%srigid(i)
+                                           dihe%kinv(i),';',dihe%sinv(i),trim(dihe%labinv(i))
          end do
        end if
 !
        if ( dihe%nflexi .gt. 0 ) then
          do i = 1, dihe%nflexi
            do j = 1, dihe%flexi(i)%ntor     
-              write(uni,'(2X,5(1X,I3),2(1X,F9.4),1X,I4,5X,A,2X,I4)')   &
+              write(uni,'(2X,5(1X,I3),2(1X,F9.4),1X,I4,5X,A,2X,I4,1X,A)')   &
                 dihe%flexi(i)%itor(:),dihe%fflexi(i),                  &
                 dihe%flexi(i)%tor(j)%phase,dihe%flexi(i)%tor(j)%vtor,  &
-                dihe%flexi(i)%tor(j)%multi!,';',dihe%flexi(i)%tor(j)%stor
+                dihe%flexi(i)%tor(j)%multi,';',dihe%flexi(i)%tor(j)%stor,trim(dihe%labflexi(i))
            end do 
          end do
        end if

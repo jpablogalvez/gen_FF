@@ -475,14 +475,14 @@
 ! Setting initial partitions  ! TODO: incorporate isotopes information through mass
 ! --------------------------
 !             
-       if ( len_trim(intop) .eq. 0 )  then
+!~        if ( len_trim(intop) .eq. 0 )  then
          call strnormlabels(nat,lab,ilab,nlab)         
-         allocate(itype(nat))
+         if (.NOT.allocated(itype)) allocate(itype(nat))
          itype(:) = ilab(:)
-       else
-         ilab(:) = itype(:)
-         nlab    = reftop%attype%ntype
-       end if
+!~        else
+!~          ilab(:) = itype(:)
+!~          nlab    = reftop%attype%ntype
+!~        end if
 !
 ! Atom typing strategy
 ! --------------------
@@ -618,7 +618,7 @@
          do i = 1, nat
            top%atom%residue(i) = top%mol%resname
            top%atom%atom(i)    = lab(i)
-           top%atom%mass(i)    = 0.0d0
+           top%atom%mass(i)    = mass(i)
            top%atom%charge(i)  = 0.0d0
            top%atom%cgnr(i)    = i
            top%atom%atnr(i)    = i
@@ -633,7 +633,7 @@
 !
        if ( fqmout ) then
 !
-         call genffbonded(nat,coord,adj,ideg,lcycle,lrigid,            &
+         call genffbonded(nat,idat,coord,adj,ideg,lcycle,lrigid,       &
                           znum,top%bonded,dihe,iroute,debug)
 !
        else
@@ -683,8 +683,9 @@
 !
        write(unideps,'(A)') '$dependence 1.2'
 !
-       call symffbonded(nat,nidat,idat,top%bonded,dihe,                &
-                        fsymm,debug)
+       call symffbonded(nat,nidat,idat,newlab,top%bonded,dihe,         &
+                        rank,marunit,narunit,arunit,coord,             &
+                        lheavy,adj,fsymm,debug)
 !
        write(unideps,'(A)') '$end'
 !
@@ -720,8 +721,9 @@
          write(*,*) 'Bond-stretching terms'
          write(*,*) '---------------------'
          do i = 1, top%bonded%nbond
-           write(*,'(1X,I3,3(1X,A,1X,I3),1X,A,1X,F6.4)') i,'=',top%bonded%ibond(1,i), &
-                                 '-',top%bonded%ibond(2,i)!,':',top%bonded%idbond(i),'=',top%bonded%bond(i)
+           write(*,'(1X,I3,3(1X,A,1X,I3),1X,A,1X,F6.4,1X,A)') i,'=',top%bonded%ibond(1,i), &
+                                 '-',top%bonded%ibond(2,i),                             &
+                                 ':',top%bonded%idbond(i),'=',top%bonded%bond(i),trim(top%bonded%labbond(i))
          end do
          write(*,*)
 !
@@ -729,8 +731,9 @@
          write(*,*) 'Angle-bending terms'
          write(*,*) '-------------------'
          do i = 1, top%bonded%nang
-           write(*,'(1X,I3,4(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',top%bonded%iang(1,i), &
-                     '-',top%bonded%iang(2,i),'-',top%bonded%iang(3,i)!,':',top%bonded%idang(i),'=',top%bonded%ang(i)
+           write(*,'(1X,I3,4(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',top%bonded%iang(1,i), &
+                     '-',top%bonded%iang(2,i),'-',top%bonded%iang(3,i),                &
+                     ':',top%bonded%idang(i),'=',top%bonded%ang(i),trim(top%bonded%labang(i))
          end do
          write(*,*)
 !
@@ -742,8 +745,9 @@
          if ( dihe%nimpro .gt. 0 ) then
            write(*,*) '; Impropers o.o.p'
            do i = 1, dihe%nimpro
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%iimpro(1,i), &
-     '-',dihe%iimpro(2,i),'-',dihe%iimpro(3,i),'-',dihe%iimpro(4,i)!,':',dihe%idimpro(i),'=',dihe%dimpro(i)
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%iimpro(1,i), &
+     '-',dihe%iimpro(2,i),'-',dihe%iimpro(3,i),'-',dihe%iimpro(4,i),                 &
+     ':',dihe%idimpro(i),'=',dihe%dimpro(i),trim(dihe%labimpro(i))
            end do
            write(*,*)
          end if
@@ -751,8 +755,9 @@
          if ( dihe%ninv .gt. 0 ) then
            write(*,*) '; Inversion dihedrals'
            do i = 1, dihe%ninv
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%iinv(1,i), &
-     '-',dihe%iinv(2,i),'-',dihe%iinv(3,i),'-',dihe%iinv(4,i)!,':',dihe%idinv(i),'=',dihe%dinv(i)
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%iinv(1,i), &
+     '-',dihe%iinv(2,i),'-',dihe%iinv(3,i),'-',dihe%iinv(4,i),                     &
+     ':',dihe%idinv(i),'=',dihe%dinv(i),trim(dihe%labinv(i))
            end do
            write(*,*)
          end if
@@ -760,8 +765,9 @@
          if ( dihe%nrigid .gt. 0 ) then
            write(*,*) '; Impropers on double bonds/aromatic cycles'
            do i = 1, dihe%nrigid
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%irigid(1,i), &
-     '-',dihe%irigid(2,i),'-',dihe%irigid(3,i),'-',dihe%irigid(4,i)!,':',dihe%idrigid(i),'=',dihe%drigid(i)
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%irigid(1,i), &
+     '-',dihe%irigid(2,i),'-',dihe%irigid(3,i),'-',dihe%irigid(4,i),               &
+     ':',dihe%idrigid(i),'=',dihe%drigid(i),trim(dihe%labrigid(i))
            end do
            write(*,*)
          end if
@@ -770,7 +776,7 @@
            write(*,*) '; Flexible'
            do i = 1, dihe%nflexi
              write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4)') i,'=',dihe%iflexi(1,i),  &
-      '-',dihe%iflexi(2,i),'-',dihe%iflexi(3,i),'-',dihe%iflexi(4,i)!,':',dihe%idflexi(i),'=',dihe%dflexi(i)
+      '-',dihe%iflexi(2,i),'-',dihe%iflexi(3,i),'-',dihe%iflexi(4,i),':',dihe%idflexi(i),'=',dihe%dflexi(i)
            end do
            write(*,*)
          end if

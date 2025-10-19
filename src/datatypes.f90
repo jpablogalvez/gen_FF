@@ -62,6 +62,8 @@
        end type gromolecule
 !
        type grobonded
+         character(len=50),dimension(:),allocatable ::  labbond  !
+         character(len=50),dimension(:),allocatable ::  labang   !
          real(kind=8),dimension(:),allocatable      ::  bond     !  Equilibrium bond distance
          real(kind=8),dimension(:),allocatable      ::  ang      !  Equilibrium angle  
          real(kind=8),dimension(:),allocatable      ::  dihe     !  Equilibrium dihedral angle
@@ -109,6 +111,10 @@
 !
        type dihedrals
          type(flexible),dimension(:),allocatable    ::  flexi    !
+         character(len=50),dimension(:),allocatable ::  labflexi !
+         character(len=50),dimension(:),allocatable ::  labrigid !
+         character(len=50),dimension(:),allocatable ::  labimpro !
+         character(len=50),dimension(:),allocatable ::  labinv   !
          real(kind=8),dimension(:),allocatable      ::  dflexi   !
          real(kind=8),dimension(:),allocatable      ::  drigid   !
          real(kind=8),dimension(:),allocatable      ::  dimpro   !
