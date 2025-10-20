@@ -838,9 +838,9 @@
 !
 ! Local variables
 !
+       logical,dimension(n,n,r)            ::  set_orthadj
        logical,dimension(n,n)              ::  mstadj
        logical,dimension(n,n)              ::  chordsadj
-       logical,dimension(n,n)              ::  set_orthadj
        logical,dimension(n,n)              ::  baseadj
        logical,dimension(n,n)              ::  minadj
        integer,dimension(2,ne)             ::  iedge   !  Adjacency list
@@ -911,11 +911,12 @@
              nset_orth = nset_orth + 1
              set_orthedge(1,nset_orth) = i
              set_orthedge(2,nset_orth) = j
+             set_orthadj(:,:,nset_orth) = .FALSE.
+             set_orthadj(i,j,nset_orth) = .TRUE.
+             set_orthadj(j,i,nset_orth) = .TRUE.
            end if
          end do
        end do
-!
-       set_orthadj(:,:) = chordsadj(:,:)
 !
 !~ write(*,*) 'nset_orth    ',nset_orth
 !~ write(*,*) 'Initial set_orth edges'
@@ -941,17 +942,8 @@
 !~ write(*,*) 'STARTING NEW ITERATION'
 !~ write(*,*) '----------------------'
 !
-         u = set_orthedge(1,nset_orth)
-         v = set_orthedge(2,nset_orth)
 !
-         nbase = nbase + 1
-!
-         baseadj(u,v) = .TRUE.
-         baseadj(v,u) = .TRUE.
-!
-         set_orthadj(u,v) = .FALSE.
-         set_orthadj(v,u) = .FALSE.
-!
+         baseadj(:,:) = set_orthadj(:,:,nset_orth)
          nset_orth = nset_orth - 1
 !
 !~ write(*,*) 'Updated base matrix'
@@ -982,44 +974,28 @@
 !~ end do
 !~ write(*,*)
 !
-! Counting the number of commom edges between set_orth and minedge
-!
-         icount = 0
-         do i = 1, minlength
-           if ( set_orthadj(minedge(1,i),minedge(2,i)) ) then
-             icount = icount + 1
-           end if
-         end do
-!
-! If the number of common edges is odd, update set_orth
-!
-        if ( mod(icount,2) .eq. 0 ) then
-          do i = 1, n-1
-            do j = i+1, n
-              if ( baseadj(i,j) .AND. set_orthadj(i,j) ) then
-! If the edge is in base and set_orth, remove it from set_orth
-                set_orthadj(i,j) = .FALSE.
-                set_orthadj(j,i) = .FALSE.
-              else if ( baseadj(i,j) .AND. set_orthadj(i,j) ) then
-! If the edge is in base but not in set_orth, add it to set_orth
-                set_orthadj(i,j) = .TRUE.
-                set_orthadj(j,i) = .TRUE.
-              end if
-! If the edge is in set_orth but not in base, keep it in set_orth
-            end do
+       do k = 1, nset_orth
+          icount = 0
+          do i = 1, minlength
+             u = minedge(1,i)
+             v = minedge(2,i)
+             if ( set_orthadj(u,v,k) ) icount = icount + 1
           end do
-        end if
 !
-         nset_orth = 0
-         do i = 1, n-1
-           do j = i+1, n
-             if ( set_orthadj(i,j) ) then
-               nset_orth = nset_orth + 1
-               set_orthedge(1,nset_orth) = i
-               set_orthedge(2,nset_orth) = j
-             end if
-           end do
-         end do
+          if ( mod(icount,2) .eq. 1 ) then
+             do i = 1, n-1
+                do j = i+1, n
+                   if ( baseadj(i,j) .neqv. set_orthadj(i,j,k) ) then
+                      set_orthadj(i,j,k) = .TRUE.
+                      set_orthadj(j,i,k) = .TRUE.
+                   else
+                      set_orthadj(i,j,k) = .FALSE.
+                      set_orthadj(j,i,k) = .FALSE.
+                   end if
+                end do
+             end do
+          end if
+       end do
 !
 !write(*,*) 'nset_orth',nset_orth
 !write(*,*) 'Updated set_orth edges'

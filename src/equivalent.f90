@@ -742,12 +742,12 @@
            write(*,*) '--------------'
          end if
 !
-         if ( dihe%nimpro .gt. 0 ) then
-           write(*,*) '; Impropers o.o.p'
-           do i = 1, dihe%nimpro
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%iimpro(1,i), &
-     '-',dihe%iimpro(2,i),'-',dihe%iimpro(3,i),'-',dihe%iimpro(4,i),                 &
-     ':',dihe%idimpro(i),'=',dihe%dimpro(i),trim(dihe%labimpro(i))
+         if ( dihe%nrigid .gt. 0 ) then
+           write(*,*) '; Impropers on double bonds/aromatic cycles'
+           do i = 1, dihe%nrigid
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%irigid(1,i), &
+     '-',dihe%irigid(2,i),'-',dihe%irigid(3,i),'-',dihe%irigid(4,i),               &
+     ':',dihe%idrigid(i),'=',dihe%drigid(i),trim(dihe%labrigid(i))
            end do
            write(*,*)
          end if
@@ -762,12 +762,12 @@
            write(*,*)
          end if
 !
-         if ( dihe%nrigid .gt. 0 ) then
-           write(*,*) '; Impropers on double bonds/aromatic cycles'
-           do i = 1, dihe%nrigid
-             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%irigid(1,i), &
-     '-',dihe%irigid(2,i),'-',dihe%irigid(3,i),'-',dihe%irigid(4,i),               &
-     ':',dihe%idrigid(i),'=',dihe%drigid(i),trim(dihe%labrigid(i))
+         if ( dihe%nimpro .gt. 0 ) then
+           write(*,*) '; Impropers o.o.p'
+           do i = 1, dihe%nimpro
+             write(*,'(1X,I3,5(1X,A,1X,I3),1X,A,1X,F9.4,1X,A)') i,'=',dihe%iimpro(1,i), &
+     '-',dihe%iimpro(2,i),'-',dihe%iimpro(3,i),'-',dihe%iimpro(4,i),                 &
+     ':',dihe%idimpro(i),'=',dihe%dimpro(i),trim(dihe%labimpro(i))
            end do
            write(*,*)
          end if

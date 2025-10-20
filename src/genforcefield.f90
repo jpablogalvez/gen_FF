@@ -2731,10 +2731,10 @@
 !
            iquad(:,j) = iidx(:)
 !
-!~ write(*,*) 'TARGET',iidx(:),':',idat(iidx(1)),idat(iidx(2)),idat(iidx(3)),idat(iidx(4))
+!!!write(*,*) 'TARGET',iidx(:),':',idat(iidx(1)),idat(iidx(2)),idat(iidx(3)),idat(iidx(4))
 ! Find index of actual quadruplet in original list
            do k = 1, nrigid
-!~ write(*,*) 'checking',idihe(:,k)
+!!!write(*,*) 'checking',idihe(:,k)
              if ( .NOT. visitdi(k) ) then
                if ( (iidx(1).eq.idihe(1,k))                            &
                     .and. (iidx(2).eq.idihe(2,k))                      &
@@ -2742,12 +2742,12 @@
                     .and. (iidx(4).eq.idihe(4,k)) ) then
                  idxdihe(j) = k
                  visitdi(k) = .TRUE.
-!~ write(*,*) 'ORIGINAL DIHEDRAL FOUND'
+!!!write(*,*) 'ORIGINAL DIHEDRAL FOUND'
                  exit
                end if
              end if
            end do ! FIXME: if idxdihe(j) == -1 there is a problem ; target dihedral is not found in original list
-!~ write(*,*)
+!!!write(*,*)
 !
 ! Assign a type to the actual quadruplet
 ! --------------------------------------
