@@ -882,6 +882,7 @@
 !
        allocate(dihed%iimpro(4,ndihe),dihed%dimpro(ndihe),             &
                 dihed%kimpro(ndihe),dihed%fimpro(ndihe))
+!
        dihed%iimpro(:,:) = 0
        dihed%fimpro(:)   = 0
        dihed%dimpro(:)   = 0.0d0
@@ -890,6 +891,7 @@
 !
        allocate(dihed%iinv(4,ndihe),dihed%dinv(ndihe),                 &
                 dihed%kinv(ndihe),dihed%finv(ndihe))
+!
        dihed%iinv(:,:) = 0
        dihed%finv(:)   = 0
        dihed%dinv(:)   = 0.0d0
@@ -1978,8 +1980,6 @@
          end do
 !
        end do
-!
-       dihed%ndihe = dihed%nimpro + dihed%ninv + dihed%nrigid + dihed%nflexi
 !
        return
        end subroutine setdihe
