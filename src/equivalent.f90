@@ -1,6 +1,6 @@
 !======================================================================!
 !
-       program evaluation
+       program gen_FF 
 !
        use timings
        use lengths,       only:  leninp,lentag,lenlab,lenarg
@@ -701,7 +701,7 @@
 ! --------------------------
 !
 !~        call print_ic
-       call print_step1(bas,topout,reftop%nstiff,fpairs)
+       call print_step1(bas,topout,qmout,reftop%nstiff,fpairs)
 !
 ! Printing summary of the input information
 !
@@ -875,7 +875,7 @@
 !    
        call print_end()
 !
-       end program evaluation
+       end program gen_FF 
 !
 !======================================================================!
 !
@@ -1430,7 +1430,7 @@
 !
 ! This subroutine 
 !
-       subroutine print_step1(bas,top,nstiff,fpairs)
+       subroutine print_step1(bas,top,qmout,nstiff,fpairs)
 !
        use lengths,  only: leninp,lenline
        use units,    only: unijoyce,unitmp
@@ -1441,22 +1441,27 @@
 !
        character(len=leninp),intent(in)          ::  bas     !
        character(len=leninp),intent(in)          ::  top     !
+       character(len=leninp),intent(in)          ::  qmout   !
        integer,intent(in)                        ::  nstiff  !
        logical,intent(in)                        ::  fpairs  !
 !
 ! Local variables
 !
+       character(len=leninp)                     ::  qmfile  !
        character(len=lenline)                    ::  line    !
        integer                                   ::  io      !
 !
 ! Generating Joyce3 input (step1) 
 ! -------------------------------
 !
+       qmfile = adjustl(qmout)
+       qmfile = qmfile(:len_trim(qmfile)-4)//'.fcc'
+!
        open(unit=unijoyce,file='joyce.'//trim(bas)//'.step1.inp',      &
             action='write')
 !
        write(unijoyce,'(A)') '$title Target - Step 1'
-       write(unijoyce,'(A)') '$equil ../qm_data/'//trim(bas)//'.fcc'
+       write(unijoyce,'(A)') '$equil '//trim(qmfile)
        write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
        write(unijoyce,'(A)') '$zero 1.d-12'
        write(unijoyce,'(A)') '$whess 5000. 2500.0'
