@@ -1028,7 +1028,7 @@
 !
 !  Finding equivalent dihedrals terms
 !
-       if ( bonded%ndihe .eq. 0 ) return
+       if ( dihed%ndihe .eq. 0 ) return
 !
        allocate(ivaux(dihed%ndihe))
 !
