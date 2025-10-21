@@ -445,7 +445,8 @@
 !
 !  Generating rigidlist with rigid bonds
 !
-         call genrigidlist(nat,wiberg,lcycle,lrigid,laroma,latar)  
+         call genrigidlist(nat,rank,wiberg,coord,cycles,ncycle,        &
+                           mcycle,lcycle,lrigid,laroma,latar) 
 !
 ! Generating representation of aromatic cycles
 !
@@ -1458,8 +1459,7 @@
        qmfile = adjustl(qmout)
        qmfile = qmfile(:len_trim(qmfile)-4)//'.fcc'
 !
-       open(unit=unijoyce,file='joyce.'//trim(bas)//'.step1.inp',      &
-            action='write')
+       open(unit=unijoyce,file='joyce.step1.inp',action='write')
 !
        write(unijoyce,'(A)') '$title Target - Step 1'
        write(unijoyce,'(A)') '$equil '//trim(qmfile)
