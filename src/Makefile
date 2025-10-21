@@ -24,6 +24,7 @@ SRCMOD  = lengths.f90       \
           gromacs_files.f90 \
           graphtools.f90    \
           isomorphism.f90   \
+          genfftools.f90    \
           genforcefield.f90 \
           wrap_lapack.f90
 

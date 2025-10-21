@@ -14,6 +14,7 @@
        use gromacs_files
        use g16_files
        use graphtools
+       use genfftools
        use genforcefield
 !
        implicit none
