@@ -3,7 +3,7 @@
        program gen_FF 
 !
        use timings
-       use lengths,       only:  leninp,lentag,lenlab,lenarg
+       use lengths,       only:  leninp,lenout,lentag,lenlab,lenarg
        use units,         only:  uniinp,uniic,unideps,unitmp,          &
                                  unitop,uninb,unicorr
 !
@@ -26,6 +26,7 @@
        character(len=leninp)                           ::  intop    !
        character(len=leninp)                           ::  topout   !
        character(len=leninp)                           ::  qmout    !
+       character(len=leninp)                           ::  qmdir    !
        character(len=lenarg)                           ::  sysname  !
        character(len=lenlab)                           ::  resname  !
        real(kind=8)                                    ::  fsig     !
@@ -48,12 +49,17 @@
        character(len=lentag)                           ::  topext   !
        character(len=lentag)                           ::  formt    !  QC  output format
        logical                                         ::  fqmout   !
+       logical                                         ::  fqmscan  !
+       logical                                         ::  fqmdihe  !
 !
        character(len=20)                               ::  meth     !
        character(len=20)                               ::  basis    !
        character(len=30)                               ::  disp     !
        integer                                         ::  chrg     !
        integer                                         ::  mult     !
+!
+       real(kind=8)                                    ::  step     !
+       integer                                         ::  nstep    !
 !
        real(kind=8),dimension(:,:),allocatable         ::  coord    !  Atomic coordinates
        real(kind=8),dimension(:),allocatable           ::  mass     !  Atomic masses
@@ -104,6 +110,8 @@
 !
 ! Auxiliary variables
 !
+       character(len=lenout)                           ::  cname    !
+       character(len=30)                               ::  cnum     !
        logical                                         ::  match    !
        integer                                         ::  lin      !  
        integer                                         ::  lfin     ! 
@@ -134,9 +142,10 @@
 !
 ! Reading command line options
 !
-       call command_line(inp,ref,intop,topout,qmout,knei,iroute,       &
-                         formt,meth,basis,disp,chrg,mult,sysname,      &
-                         resname,nmol,fsig,feps,fsymm,fpairs,fexcl,debug)
+       call command_line(inp,ref,intop,topout,qmout,qmdir,knei,        &
+                         iroute,formt,meth,basis,disp,chrg,mult,step,  &
+                         nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
+                         fpairs,fexcl,debug)
 !
 ! Defaults
 !
@@ -208,16 +217,16 @@
 !
        if ( len_trim(qmout) .gt. 0 ) then
 !
-         INQUIRE(FILE=trim(qmout),EXIST=fqmout)
+         INQUIRE(FILE=trim(qmdir)//trim(qmout),EXIST=fqmout)
 !
        else
 !
          qmout = trim(bas)//'_of'
 !
-         INQUIRE(FILE=trim(qmout)//'.log',EXIST=fqmout)
+         INQUIRE(FILE=trim(qmdir)//trim(qmout)//'.log',EXIST=fqmout)
 !
          if ( .NOT. fqmout ) then
-           INQUIRE(FILE=trim(qmout)//'.out',EXIST=fqmout)
+           INQUIRE(FILE=trim(qmdir)//trim(qmout)//'.out',EXIST=fqmout)
            qmout = trim(qmout)//'.out'
          else
            qmout = trim(qmout)//'.log'
@@ -300,13 +309,15 @@
 !
 ! If QM output is provided then extract molecular information
 !
-         call chk_qmout(qmout,formt) ! TODO: read orca output
+         cname =  trim(qmdir)//trim(qmout)
 !
-         call chk_log(qmout,nat)
+         call chk_qmout(cname,formt) ! TODO: read orca output
+!
+         call chk_log(cname,nat)
 !
          allocate(coord(3,nat),lab(nat),znum(nat),mass(nat))
 !
-         call read_log(qmout,nat,coord,lab,znum,mass) !  TODO: check inconsistency between topology and qm output
+         call read_log(cname,nat,coord,lab,znum,mass) !  TODO: check inconsistency between topology and qm output
 !
          top%nat = nat
 !
@@ -318,7 +329,8 @@
 !
 !  Reading Wiberg bond index matrix  ! TODO: only supports gaussian QC output
 !
-         call readwiberg(qmout,nat,wiberg)  
+         cname =  trim(qmdir)//trim(qmout)
+         call readwiberg(cname,nat,wiberg)  
 !
        end if
 !
@@ -635,8 +647,8 @@
 !
        if ( fqmout ) then
 !
-         call genffbonded(nat,idat,coord,adj,ideg,lcycle,lrigid,       &
-                          znum,top%bonded,dihe,iroute,debug)
+         call genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,        &
+                          lrigid,znum,top%bonded,dihe,iroute,debug)
 !
        else
 !
@@ -676,7 +688,6 @@
                         dihe%nimpro + dihe%ninv + dihe%nrigid
        reftop%nsoft   = dihe%nflexi
 !
-!
 ! Symmetrizing force field terms
 ! ------------------------------
 !
@@ -693,6 +704,26 @@
 !
        close(unideps)
 !
+! Selecting unique cuadruplets
+! ----------------------------
+!
+       if ( dihe%nquad .gt. 1 ) call selectquad(nat,dihe%nquad,dihe,   &
+                                                 idat,nidat) 
+       do i = 1, dihe%nquad
+!
+         write(cnum,*) i
+         cnum  = adjustl(cnum)
+         cname = trim(bas)//'_scan-'//trim(cnum)
+!
+         INQUIRE(FILE=trim(qmdir)//trim(cname)//'.log',EXIST=fqmscan)
+!
+         if ( .NOT. fqmscan ) then
+           call genscan(i,nat,lab,coord,dihe%nquad,dihe%iquad,nstep,   &
+                        step,cname,qmdir,formt,meth,basis,disp,chrg,mult)
+         end if
+!
+       end do
+!
 ! Printing force field
 ! --------------------
 !
@@ -703,7 +734,8 @@
 ! --------------------------
 !
 !~        call print_ic
-       call print_step1(bas,topout,qmout,reftop%nstiff,fpairs)
+       call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,fpairs)
+!~        call print_step2(bas,topout,qmout,reftop%nstiff,fpairs)
 !
 ! Printing summary of the input information
 !
@@ -881,10 +913,10 @@
 !
 !======================================================================!
 !
-       subroutine command_line(inp,ref,top,topout,qmout,knei,iroute,   &
-                               formt,meth,basis,disp,chrg,mult,        & 
-                               sysname,resname,nmol,fsig,feps,fsymm,   &
-                               fpairs,fexcl,debug)
+       subroutine command_line(inp,ref,top,topout,qmout,qmdir,knei,    &
+                               iroute,formt,meth,basis,disp,chrg,mult, & 
+                               step,nstep,sysname,resname,nmol,fsig,   &
+                               feps,fsymm,fpairs,fexcl,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -898,12 +930,15 @@
        character(len=leninp),intent(out)  ::  top      !  Topology file name
        character(len=leninp),intent(out)  ::  topout   !  Output topology file name
        character(len=leninp),intent(out)  ::  qmout    !  QC input file name
+       character(len=leninp),intent(out)  ::  qmdir    !  
        character(len=leninp),intent(out)  ::  ref      !  Reference xyz file name
        character(len=lentag),intent(out)  ::  formt    !
        character(len=lenarg),intent(out)  ::  sysname  !
        character(len=lenlab),intent(out)  ::  resname  !
+       real(kind=8),intent(out)           ::  step     !
        real(kind=8),intent(out)           ::  fsig     !
        real(kind=8),intent(out)           ::  feps     !
+       integer,intent(out)                ::  nstep    !  
        integer,intent(out)                ::  nmol     !  
        integer,intent(out)                ::  knei     !  
        integer,intent(out)                ::  iroute   !  
@@ -934,15 +969,20 @@
        ref    = ''
        top    = ''
        topout = ''
-       qmout  = ''
 !
        sysname = '[none]'
        resname = '[no]'
        nmol    = -1
 !
-       formt  = 'gaussian'
        knei   = -1
        iroute = 1
+!
+       formt  = 'g16'
+       step  = 15.0
+       nstep = 23
+!
+       qmout  = ''
+       qmdir  = '../QMdata/'
 !
        meth  = 'PBEPBE'
        basis = '6-31+G(D)'
@@ -1222,6 +1262,7 @@
 !
 ! Local variables
 !
+       character(len=30)                         ::  cdisp   !
        integer                                   ::  i       !
 !
 ! Generating QC input
@@ -1239,9 +1280,9 @@
          case('gaussian')
 !
            if ( (trim(disp).eq.'none') .or. (len_trim(disp).eq.0) ) then
-             disp = ''
+             cdisp = ''
            else
-             disp = 'empiricaldispersion='//trim(disp)
+             cdisp = 'empiricaldispersion='//trim(disp)
            end if 
 !
            open(unit=uniout,file=trim(bas)//'_of.com',action='write')
@@ -1251,7 +1292,7 @@
            write(uniout,'(A)') '#p opt freq=intmodes pop=NBORead g'//  &
                                                                  'finput'
            write(uniout,'(A)') trim(meth)//'/'//trim(basis)//' '//     &
-                                                              trim(disp)
+                                                             trim(cdisp)
            write(uniout,*)
            write(uniout,'(A)') trim(bas)//' optimization and frequ'//  &
                                                                 'encies'
@@ -1270,6 +1311,89 @@
 !
        return
        end subroutine geninp
+!
+!======================================================================!
+!
+! GENSCAN - GENerate SCAN
+!
+! This subroutine 
+!
+       subroutine genscan(idx,nat,lab,coord,nquad,iquad,nstep,step,    &
+                          bas,qmdir,formt,meth,basis,disp,chrg,mult)
+!
+       use lengths,  only: leninp,lentag,lenlab
+       use units,    only: uniout
+!
+       implicit none
+!
+! Input/output variables
+!
+       character(len=leninp),intent(in)          ::  bas     !
+       character(len=leninp),intent(in)          ::  qmdir   !
+       character(len=lenlab),dimension(nat)      ::  lab     !  Atomic labels
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord   ! 
+       real(kind=8),intent(in)                   ::  step    ! 
+       integer,dimension(4,nquad),intent(in)     ::  iquad   !
+       integer,intent(in)                        ::  nat     !
+       integer,intent(in)                        ::  nquad   !
+       integer,intent(in)                        ::  nstep   !
+       integer,intent(in)                        ::  idx     !
+!
+       character(len=lentag),intent(in)          ::  formt   !
+       character(len=20)                         ::  meth    !
+       character(len=20)                         ::  basis   !
+       character(len=30)                         ::  disp    !
+       integer,intent(in)                        ::  chrg    !
+       integer,intent(in)                        ::  mult    !
+!
+! Local variables
+!
+       character(len=30)                         ::  cdisp   !
+       integer                                   ::  i       !
+!
+! Generating QC input
+! -------------------
+!
+       select case (trim(formt))
+         case('orca')
+!
+           stop 'Orca QC calculation not supported yet!'
+!
+         case('g16')
+!
+           if ( (trim(disp).eq.'none') .or. (len_trim(disp).eq.0) ) then
+             cdisp = ''
+           else
+             cdisp = 'empiricaldispersion='//trim(disp)
+           end if 
+!
+           open(unit=uniout,file=trim(qmdir)//trim(bas)//'.com',       &
+                action='write')
+!
+           write(uniout,'(A)') '%nprocshared=8'
+           write(uniout,'(A)') '%chk='//trim(bas)//'.chk'
+           write(uniout,'(A)') '#p OPT=(Modredundant)'
+           write(uniout,'(A)') trim(meth)//'/'//trim(basis)//' '//     &
+                                                             trim(cdisp)
+           write(uniout,*)
+           write(uniout,'(A,1X,4I4)') trim(bas)//' scanning dihedral', &
+                                                            iquad(:,idx)
+           write(uniout,*)
+           write(uniout,'(I1,1X,I1)') chrg,mult
+           do i = 1, nat
+             write(uniout,'(A5,3(1X,F12.6))') lab(i),coord(:,i)
+           end do
+           write(uniout,*)
+           write(uniout,'(A,1X,4I4,1X,A,1X,I3,1X,F6.2)')               &
+                                         'D',iquad(:,idx),'S',nstep,step
+           write(uniout,*)
+!
+           close(uniout)
+!     
+       end select
+!
+       return
+       end subroutine genscan
 !
 !======================================================================!
 !
@@ -1428,11 +1552,11 @@
 !
 !======================================================================!
 !
-! GENINP - GENerate INPut
+! PRINT_STEP1 - PRINT input STEP 1
 !
 ! This subroutine 
 !
-       subroutine print_step1(bas,top,qmout,nstiff,fpairs)
+       subroutine print_step1(bas,top,qmout,qmdir,nstiff,fpairs)
 !
        use lengths,  only: leninp,lenline
        use units,    only: unijoyce,unitmp
@@ -1444,6 +1568,7 @@
        character(len=leninp),intent(in)          ::  bas     !
        character(len=leninp),intent(in)          ::  top     !
        character(len=leninp),intent(in)          ::  qmout   !
+       character(len=leninp),intent(in)          ::  qmdir   !
        integer,intent(in)                        ::  nstiff  !
        logical,intent(in)                        ::  fpairs  !
 !
@@ -1462,12 +1587,16 @@
        open(unit=unijoyce,file='joyce.step1.inp',action='write')
 !
        write(unijoyce,'(A)') '$title Target - Step 1'
-       write(unijoyce,'(A)') '$equil '//trim(qmfile)
+       write(unijoyce,'(A)') '$equil '//trim(qmdir)//trim(qmfile)
        write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
        write(unijoyce,'(A)') '$zero 1.d-12'
        write(unijoyce,'(A)') '$whess 5000. 2500.0'
-       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
        if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
+       write(unijoyce,*) 
+       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         & 
+                                                          '_freqchk.agr'
+       write(unijoyce,*) 
+       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
        write(unijoyce,*) 
        write(unijoyce,'(A)') '$dependence 1.2'
 !
@@ -1488,5 +1617,75 @@
 !
        return
        end subroutine print_step1
+!
+!======================================================================!
+!
+! PRINT_STEP1 - PRINT input STEP 2
+!
+! This subroutine 
+!
+       subroutine print_step2(bas,top,qmout,qmdir,nstiff,fpairs)
+!
+       use lengths,  only: leninp,lenline
+       use units,    only: unijoyce,unitmp
+!
+       implicit none
+!
+! Input/output variables
+!
+       character(len=leninp),intent(in)          ::  bas     !
+       character(len=leninp),intent(in)          ::  top     !
+       character(len=leninp),intent(in)          ::  qmout   !
+       character(len=leninp),intent(in)          ::  qmdir   !
+       integer,intent(in)                        ::  nstiff  !
+       logical,intent(in)                        ::  fpairs  !
+!
+! Local variables
+!
+       character(len=leninp)                     ::  qmfile  !
+       character(len=lenline)                    ::  line    !
+       integer                                   ::  io      !
+!
+! Generating Joyce3 input (step1) 
+! -------------------------------
+!
+       qmfile = adjustl(qmout)
+       qmfile = qmfile(:len_trim(qmfile)-4)//'.fcc'
+!
+       open(unit=unijoyce,file='joyce.step1.inp',action='write')
+!
+       write(unijoyce,'(A)') '$title Target - Step 1'
+       write(unijoyce,'(A)') '$equil '//trim(qmdir)//trim(qmfile)
+       write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
+       write(unijoyce,'(A)') '$zero 1.d-12'
+       write(unijoyce,'(A)') '$whess 5000. 2500.0'
+       if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
+       write(unijoyce,*) 
+       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         & 
+                                                          '_freqchk.agr'
+       write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         & 
+                                                          '_torschk.agr'
+       write(unijoyce,*) 
+       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
+       write(unijoyce,*) 
+       write(unijoyce,'(A)') '$dependence 1.2'
+!
+       rewind(unitmp)
+       do
+         read(unitmp,'(A)',iostat=io) line
+         if ( io /= 0 ) exit
+         write(unijoyce,'(A)') trim(line)
+       end do
+!
+! Closing output files
+! --------------------
+!
+       write(unijoyce,'(A)') '$end'
+       write(unijoyce,*)
+!
+       close(unijoyce)
+!
+       return
+       end subroutine print_step2
 !
 !======================================================================!

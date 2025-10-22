@@ -14,6 +14,7 @@
                    genheavylist,                                       &
                    findarcycles,                                       &
                    bonded2dihe,                                        &
+                   selectquad,                                         &
                    calc_angle,                                         &
                    diedro
 !
@@ -597,6 +598,79 @@
 !
        return
        end subroutine bonded2dihe
+!
+!======================================================================!
+!
+! SELECTQUAD - SELECT QUADruplet
+!
+! This subroutine 
+!
+       subroutine selectquad(nat,ndihe,dihe,idat,nidat)
+!
+       use datatypes,  only:  dihedrals
+!
+       use printings,  only:  print_end
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(inout)      ::  dihe    !
+       integer,dimension(nat),intent(in)  ::  idat    !
+       integer,intent(in)                 ::  nat     !
+       integer,intent(in)                 ::  nidat   !
+       integer,intent(in)                 ::  ndihe   !
+!
+! Local variables
+!
+       real(kind=8),dimension(ndihe)      ::  dtmp     !
+       logical,dimension(ndihe)           ::  visited  !
+       integer,dimension(4,ndihe)         ::  itmp     !
+       integer,dimension(ndihe)           ::  ftmp     !
+       integer,dimension(ndihe)           ::  iddihe   !
+       integer,dimension(4)               ::  vaux     !
+       integer                            ::  ntmp     !
+       integer                            ::  i,j,k    !
+!
+!  Selecting quadruplets with unique identifiers
+! ----------------------------------------------
+!
+       do i = 1, dihe%nquad
+         vaux(:) = dihe%iquad(:,i)
+         iddihe(i) = idat(vaux(1))*nidat**3 + idat(vaux(2))*nidat**2   &
+                                   + idat(vaux(3))*nidat + idat(vaux(4))
+       end do
+!
+       visited(:) = .FALSE.
+!
+       k = 0
+       do i = 1, dihe%nquad
+!
+         if ( visited(i) ) cycle
+         k = k + 1
+         visited(i) = .TRUE.
+!
+         itmp(:,k) = dihe%iquad(:,i)
+         dtmp(k)   = dihe%dquad(i)
+         ftmp(k)   = dihe%fquad(i)
+         ntmp = k      
+!
+         do j = i+1, dihe%nquad
+           if ( visited(j) ) cycle
+           if ( iddihe(i) .eq. iddihe(j) ) then
+             visited(j) = .TRUE.
+             exit
+           end if
+         end do
+       end do
+!
+       dihe%iquad(:,:) = itmp(:,:)
+       dihe%dquad(:)   = dtmp(:)
+       dihe%fquad(:)   = ftmp(:)
+       dihe%nquad = ntmp  
+!
+       return
+       end subroutine selectquad
 !
 !======================================================================!
 !

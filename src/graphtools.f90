@@ -72,7 +72,7 @@
 !
 ! Building adjacency matrix according to Wiberg bond indexes
 !
-       thr = 0.75d0
+       thr = 0.70d0
 !
        adj(:,:) = .FALSE.
 !
@@ -1268,7 +1268,7 @@
 ! Input/output variables
 !
        integer,dimension(2,n-1),intent(out)  ::  mst     !
-       integer,dimension(2,ne),intent(out)   ::  iedge   !
+       integer,dimension(2,ne),intent(in)    ::  iedge   !
        logical,dimension(n,n),intent(out)    ::  mstadj  !
        integer,intent(in)                    ::  ne
        integer,intent(in)                    ::  n

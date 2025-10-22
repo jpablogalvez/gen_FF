@@ -115,6 +115,7 @@
          character(len=50),dimension(:),allocatable ::  labrigid !
          character(len=50),dimension(:),allocatable ::  labimpro !
          character(len=50),dimension(:),allocatable ::  labinv   !
+         real(kind=8),dimension(:),allocatable      ::  dquad    !
          real(kind=8),dimension(:),allocatable      ::  dflexi   !
          real(kind=8),dimension(:),allocatable      ::  drigid   !
          real(kind=8),dimension(:),allocatable      ::  dimpro   !
@@ -123,14 +124,17 @@
          real(kind=8),dimension(:),allocatable      ::  krigid   !
          real(kind=8),dimension(:),allocatable      ::  kimpro   !
          real(kind=8),dimension(:),allocatable      ::  kinv     !
+         integer,dimension(:,:),allocatable         ::  iquad    !
          integer,dimension(:,:),allocatable         ::  iflexi   !
          integer,dimension(:,:),allocatable         ::  irigid   !
          integer,dimension(:,:),allocatable         ::  iimpro   !
          integer,dimension(:,:),allocatable         ::  iinv     !
+         integer,dimension(:),allocatable           ::  fquad    !
          integer,dimension(:),allocatable           ::  fflexi   !
          integer,dimension(:),allocatable           ::  frigid   !
          integer,dimension(:),allocatable           ::  fimpro   !
          integer,dimension(:),allocatable           ::  finv     !
+         integer,dimension(:),allocatable           ::  squad    !
          integer,dimension(:),allocatable           ::  sflexi   !
          integer,dimension(:),allocatable           ::  srigid   !
          integer,dimension(:),allocatable           ::  simpro   !
@@ -139,6 +143,8 @@
          integer,dimension(:),allocatable           ::  idrigid  !
          integer,dimension(:),allocatable           ::  idimpro  !
          integer,dimension(:),allocatable           ::  idinv    !
+         integer,dimension(:),allocatable           ::  mapquad  !
+         integer                                    ::  nquad    !
          integer                                    ::  ndihe    !
          integer                                    ::  nflexi   !
          integer                                    ::  nrigid   !

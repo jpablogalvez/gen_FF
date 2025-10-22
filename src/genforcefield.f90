@@ -616,8 +616,8 @@
 !
 ! This subroutine 
 !
-       subroutine genffbonded(nat,idat,coord,adj,ideg,lcycle,lrigid,   &
-                              znum,bonded,dihed,iroute,debug)
+       subroutine genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,    &
+                              lrigid,znum,bonded,dihed,iroute,debug)
 !
        use datatypes, only: grobonded,                                 &
                             dihedrals
@@ -636,6 +636,7 @@
        logical,dimension(nat,nat),intent(in)              ::  lrigid    ! 
 !
        integer,dimension(nat),intent(in)                  ::  znum      !  
+       integer,intent(in)                                 ::  nidat     !
        integer,intent(in)                                 ::  nat       !  Number of atoms
 !
        integer,intent(in)                                 ::  iroute    !
@@ -663,7 +664,7 @@
        end if
 !
        if ( nat .gt. 3 ) then
-         call gendihe(nat,idat,coord,znum,ideg,lcycle,lrigid,          &
+         call gendihe(nat,idat,nidat,coord,znum,ideg,lcycle,lrigid,    &
                       bonded%nbond,bonded%ibond,bonded%nang,           &
                       bonded%iang,adjang,edgeang,dihed,iroute,debug)
        end if
@@ -823,9 +824,9 @@
 !
 ! This subroutine 
 !
-       subroutine gendihe(nat,idat,coord,znum,ideg,lcycle,lrigid,      &
-                          nbond,ibond,nang,iang,adjang,edgeang,dihed,  &
-                          iroute,debug)
+       subroutine gendihe(nat,idat,nidat,coord,znum,ideg,lcycle,       &
+                          lrigid,nbond,ibond,nang,iang,adjang,         &
+                          edgeang,dihed,iroute,debug)
 !
        use datatypes, only: dihedrals
        use graphtools
@@ -842,6 +843,7 @@
        integer,dimension(nat),intent(in)                  ::  znum     ! 
        integer,dimension(nat),intent(in)                  ::  ideg     ! 
        integer,intent(in)                                 ::  nat      !  Number of atoms
+       integer,intent(in)                                 ::  nidat    !
 !
        logical,dimension(nang,nang),intent(in)            ::  adjang   !  Boolean adjacency 
        integer,dimension(2,nang),intent(in)               ::  edgeang  !
@@ -916,8 +918,9 @@
 !
 ! Classifying adjacent angles as proper or improper dihedrals
 !
-       call setdihe(nat,idat,coord,nbond,ibond,nang,edgeang,iang,      &
-                    ndihe,dihed,edges,lcycle,lrigid,znum,ideg,iroute)
+       call setdihe(nat,idat,nidat,coord,nbond,ibond,nang,edgeang,     &
+                    iang,ndihe,dihed,edges,lcycle,lrigid,znum,ideg,    &
+                    iroute)
 !
 ! Removing 3-member cycle dihedrals  ! TODO
 !
@@ -1290,9 +1293,9 @@
 !
 ! This subroutine 
 !
-       subroutine setdihe(nat,idat,coord,nbond,ibond,nang,edgeang,iang,     &
-                          ndihe,dihed,edgedihe,lcycle,lrigid,znum,     &
-                          ideg,iroute)
+       subroutine setdihe(nat,idat,nidat,coord,nbond,ibond,nang,       &
+                          edgeang,iang,ndihe,dihed,edgedihe,lcycle,    &
+                          lrigid,znum,ideg,iroute)
 !
        use datatypes,   only: dihedrals
        use genfftools
@@ -1308,6 +1311,7 @@
        integer,dimension(nat),intent(in)          ::  idat      ! 
        integer,dimension(nat),intent(in)          ::  znum      ! 
        integer,dimension(nat),intent(in)          ::  ideg      ! 
+       integer,intent(in)                         ::  nidat     !
        integer,intent(in)                         ::  nat       !
 !
        integer,dimension(2,nbond),intent(in)      ::  ibond     !  
@@ -1324,6 +1328,7 @@
 !
 ! Local variables
 !  
+       type(dihedrals)                            ::  tmpdi     !                            
        real(kind=8),dimension(ndihe)              ::  dimpro    !
        integer,dimension(4,ndihe)                 ::  iimpro    !
        integer,dimension(ndihe)                   ::  fimpro    !
@@ -1333,13 +1338,22 @@
        integer,dimension(ndihe)                   ::  finv      !
        integer                                    ::  ninv      !
        logical,dimension(ndihe)                   ::  torsion   !
+       logical,dimension(ndihe)                   ::  visited   !
        logical,dimension(4)                       ::  lcheck    !
        logical                                    ::  flag      !
        logical                                    ::  lfound    !
        real(kind=8)                               ::  daux      !
+       real(kind=8)                               ::  daux1     !
+       real(kind=8)                               ::  daux2     !
        integer,dimension(4,ndihe)                 ::  auxdihe   !  
+       integer,dimension(ndihe)                   ::  neqquad   !  
+       integer                                    ::  meqquad   !  
+       integer,dimension(ndihe)                   ::  imap      !  
+       integer,dimension(ndihe)                   ::  iflexi    !  
        integer,dimension(ndihe)                   ::  ivaux     !  
        integer,dimension(4)                       ::  vaux      !  
+       integer,dimension(4)                       ::  vaux1     !  
+       integer,dimension(4)                       ::  vaux2     !  
        integer,dimension(2,4)                     ::  bonds     !
        integer,dimension(2)                       ::  rbond     !
        integer,dimension(2)                       ::  bond1     !
@@ -1348,6 +1362,9 @@
        integer,dimension(2)                       ::  bond4     !
        integer,dimension(3)                       ::  ang1      !
        integer,dimension(3)                       ::  ang2      !
+       integer                                    ::  nmap      !
+       integer                                    ::  id1       !
+       integer                                    ::  id2       !
        integer                                    ::  id11      !
        integer                                    ::  id12      !
        integer                                    ::  id21      !
@@ -1475,6 +1492,22 @@
          do j = 1, nimpro
            if ( dihed%iimpro(1,i) .eq. iimpro(1,j) ) then
              flag = .TRUE.
+!
+             vaux1(:) = dihed%iimpro(:,i)
+             vaux2(:) = iimpro(:,j)
+!
+             id1 = idat(vaux1(1))*nidat**3 + idat(vaux1(2))*nidat**2   &
+                   + idat(vaux1(3))*nidat + idat(vaux1(4))
+!
+             id2 = idat(vaux2(1))*nidat**3 + idat(vaux2(2))*nidat**2   &
+                   + idat(vaux2(3))*nidat + idat(vaux2(4))     
+!
+             if ( id1 .gt. id2 ) then
+               dihed%iimpro(:,i) = iimpro(:,nimpro)
+               dihed%dimpro(i)   = dimpro(nimpro)
+               dihed%fimpro(i)   = fimpro(nimpro) 
+             end if   
+!
              exit
            end if
          end do
@@ -1498,10 +1531,26 @@
 !
        ninv = 0
        do i = 1, dihed%ninv
-         flag = .TRUE.
+         flag = .FALSE.
          do j = 1, ninv
            if ( dihed%iinv(1,i) .eq. iinv(1,j) ) then
              flag = .TRUE.
+!
+             vaux1(:) = dihed%iimpro(:,i)
+             vaux2(:) = iimpro(:,i)
+!
+             id1 = idat(vaux1(1))*nidat**3 + idat(vaux1(2))*nidat**2   &
+                   + idat(vaux1(3))*nidat + idat(vaux1(4))
+!
+             id2 = idat(vaux2(1))*nidat**3 + idat(vaux2(2))*nidat**2   &
+                   + idat(vaux2(3))*nidat + idat(vaux2(4))     
+!
+             if ( id1 .gt. id2 ) then
+               dihed%iimpro(:,i) = iimpro(:,nimpro)
+               dihed%dimpro(i)   = dimpro(nimpro)
+               dihed%fimpro(i)   = fimpro(nimpro) 
+             end if   
+!
              exit
            end if
          end do
@@ -1588,6 +1637,18 @@
              vaux(1) = vaux(4)
              vaux(4) = itmp
 !
+           else if ( idat(vaux(2)) .eq. idat(vaux(3)) ) then
+             if ( idat(vaux(1)) .gt. idat(vaux(4)) ) then
+!
+               itmp    = vaux(2)
+               vaux(2) = vaux(3)
+               vaux(3) = itmp
+!
+               itmp    = vaux(1)
+               vaux(1) = vaux(4)
+               vaux(4) = itmp
+!
+             end if
            end if
 !
            call Diedro(coord(:,vaux(1)),coord(:,vaux(2)),              & 
@@ -1634,9 +1695,171 @@
 ! Generating Fourier series for each flexible dihedral
 ! ----------------------------------------------------
 !
+! Sorting flexible dihedrals by central bond
+!
+       allocate(tmpdi%iflexi(4,ndihe),tmpdi%dflexi(ndihe),             &
+                tmpdi%fflexi(ndihe))
+!
+       visited(:) = .FALSE.
+! 
+       neqquad(:) = 0
+       meqquad = 0
+!
+       k = 0
+       do i = 1, dihed%nflexi
+         if ( visited(i) ) cycle 
+!
+         meqquad = meqquad + 1
+         neqquad(meqquad) = neqquad(meqquad) + 1
+!
+         k = k + 1
+         tmpdi%iflexi(:,k) = dihed%iflexi(:,i)
+         tmpdi%fflexi(k)   = dihed%fflexi(i)
+         tmpdi%dflexi(k)   = dihed%dflexi(i)
+!
+         vaux1(:) = dihed%iflexi(:,i)
+         visited(i) = .TRUE.
+!
+         do j = 1, dihed%nflexi
+           if ( visited(j) ) cycle
+!
+           vaux2(:) = dihed%iflexi(:,j) 
+!
+           if ( ((vaux1(2).eq.vaux2(2)).and.(vaux1(3).eq.vaux2(3))) .or. &
+                ((vaux1(2).eq.vaux2(3)).and.(vaux1(3).eq.vaux2(2))) ) then
+             neqquad(meqquad) = neqquad(meqquad) + 1
+             visited(j) = .TRUE.
+             k = k + 1
+             tmpdi%iflexi(:,k) = dihed%iflexi(:,j)
+             tmpdi%fflexi(k)   = dihed%fflexi(j)
+             tmpdi%dflexi(k)   = dihed%dflexi(j)             
+           end if
+! 
+         end do
+       end do
+!
+       imap(:) = -1
+!
+       k = 0
+       do i = 1, meqquad
+!
+! Removing H-related dihedrals if possible
+!
+         nmap = 0
+!
+         flag = .TRUE.
+         do j = 1, neqquad(i)
+           vaux(:) = tmpdi%iflexi(:,k+j)
+           if ( (znum(vaux(1)).ne.1).and.(znum(vaux(4)).ne.1) ) then 
+             imap(nmap+1) = k + j
+             nmap = nmap + 1
+           end if
+         end do        
+!
+         if ( nmap .eq. 0 ) then
+           flag = .TRUE.
+           do j = 1, neqquad(i)
+             vaux(:) = tmpdi%iflexi(:,k+j)
+             if ( (znum(vaux(1)).ne.1).or.(znum(vaux(4)).ne.1) ) then 
+               imap(nmap+1) = k + j
+               nmap = nmap + 1
+             end if
+           end do  
+         end if
+!
+         if ( nmap .eq. 0 ) then
+           flag = .TRUE.
+           do j = 1, neqquad(i)
+             vaux(:) = tmpdi%iflexi(:,k+j)
+             if ( (znum(vaux(1)).eq.1).and.(znum(vaux(4)).eq.1) ) then 
+               imap(nmap+1) = k + j
+               nmap = nmap + 1
+             end if
+           end do  
+         end if
+!
+! Find leading quadruplet
+!
+         flag = .FALSE.
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.70.0d0) .and. (daux.le.105.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.35.0d0) .and. (daux.le.70.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.105.0d0) .and. (daux.le.150.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         k = k + neqquad(i)
+!
+         neqquad(i) = nmap
+!
+       end do
+!
+! Storing information of selected quadruplets
+!
+       dihed%nquad = meqquad
+       allocate(dihed%iquad(4,meqquad),dihed%dquad(meqquad),           &
+                dihed%fquad(meqquad),dihed%mapquad(meqquad))
+!
+       do i = 1, meqquad
+         dihed%iquad(:,i) = tmpdi%iflexi(:,iflexi(i))
+         dihed%dquad(i)   = tmpdi%dflexi(iflexi(i))
+         dihed%fquad(i)   = tmpdi%fflexi(iflexi(i))
+         dihed%mapquad(i) = iflexi(i)
+       end do
+!
 ! TODO: option to keep only one quadruplet per torsion
 !
-
+! Generating Fourier series
 !
        do i = 1, dihed%nflexi
 !         
@@ -1653,6 +1876,8 @@
          end do
 !
        end do
+!
+       dihed%ndihe = dihed%nrigid + dihed%ninv + dihed%nimpro + dihed%nflexi
 !
        return
        end subroutine setdihe
@@ -2287,9 +2512,8 @@
 !
        do i = 1, ndihe
          do j = 1, i
-           if ( iddihe(i) .eq. iddihe(j)  ) then ! TODO: cis/trans dihedrals have different type
-!           if ( (iddihe(i).eq.iddihe(j)) .and.                         &
-!                                  (abs(ddihe(i)-ddihe(j)).lt.thr) ) then
+           if ( (iddihe(i).eq.iddihe(j)) .and.                         &
+                      (abs(abs(ddihe(i))-abs(ddihe(j))).lt.5.0d0) ) then ! cis/trans dihedrals have different type
              eqvadj(i,j) = .TRUE.
              eqvadj(j,i) = .TRUE.
            end if
@@ -2400,6 +2624,18 @@
              iidx(1) = iidx(4)
              iidx(4) = itmp
 !
+           else if ( idat(iidx(2)) .eq. idat(iidx(3)) ) then
+             if ( idat(iidx(1)) .gt. idat(iidx(4)) ) then
+!
+               itmp    = iidx(2)
+               iidx(2) = iidx(3)
+               iidx(3) = itmp
+!
+               itmp    = iidx(1)
+               iidx(1) = iidx(4)
+               iidx(4) = itmp
+!
+             end if
            end if
 !
            iquad(:,j) = iidx(:)

@@ -15,7 +15,7 @@
 ! Declaration of the length of the input/output files
 !
        integer,parameter  ::  leninp  = 64   !
-       integer,parameter  ::  lenout  = 64   !
+       integer,parameter  ::  lenout  = 84   !
 
 !
        end module lengths
