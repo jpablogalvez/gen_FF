@@ -1047,6 +1047,11 @@
              call check_arg(qmout,io,arg,cmd)
              i = i + 1
 !
+           case ('-dir','-qmdir','--qmdir')
+             call get_command_argument(i,qmdir,status=io)
+             call check_arg(qmdir,io,arg,cmd)
+             i = i + 1
+!
            case ('-residue','-name','-resname','--resname','--residue-name')
              call get_command_argument(i,resname,status=io)
              call check_arg(resname,io,arg,cmd)
@@ -1283,7 +1288,7 @@
 !
            close(20)
 !
-         case('gaussian')
+         case('g16')
 !
            if ( (trim(disp).eq.'none') .or. (len_trim(disp).eq.0) ) then
              cdisp = ''
