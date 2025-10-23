@@ -4,7 +4,7 @@
 !
        use timings
        use lengths,       only:  leninp,lenout,lentag,lenlab,lenarg
-       use units,         only:  uniinp,uniic,unideps,unitmp,          &
+       use units,         only:  uniinp,uniic,unideps,unitmp,uniscr,   &
                                  unitop,uninb,unicorr
 !
        use datatypes
@@ -693,6 +693,7 @@
 !
        open(unit=unideps,file=trim(bas)//'_suggdeps.txt',action='write')
        open(unit=unitmp,status='scratch')
+       open(unit=uniscr,status='scratch')
 !
        write(unideps,'(A)') '$dependence 1.2'
 !
@@ -711,7 +712,7 @@
                                                  idat,nidat) 
        do i = 1, dihe%nquad
 !
-         write(cnum,*) i
+         write(cnum,'(I2.2)') i
          cnum  = adjustl(cnum)
          cname = trim(bas)//'_scan-'//trim(cnum)
 !
@@ -719,7 +720,8 @@
 !
          if ( .NOT. fqmscan ) then
            call genscan(i,nat,lab,coord,dihe%nquad,dihe%iquad,nstep,   &
-                        step,cname,qmdir,formt,meth,basis,disp,chrg,mult)
+                        step,cname,qmdir,formt,meth,basis,disp,        &
+                        chrg,mult)
          end if
 !
        end do
@@ -733,9 +735,12 @@
 ! Printing JOYCE input files
 ! --------------------------
 !
-!~        call print_ic
-       call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,fpairs)
-!~        call print_step2(bas,topout,qmout,reftop%nstiff,fpairs)
+       call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
+                        fpairs,fsymm)
+       if ( dihe%nflexi .gt. 0 ) then
+         call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
+                          fsymm,intop,top%bonded,dihe,nstep)
+       end if
 !
 ! Printing summary of the input information
 !
@@ -874,6 +879,7 @@
 !
        close(unideps)
        close(unitmp)
+       close(uniscr)
 !
 ! Deallocating local variables
 !
@@ -1334,8 +1340,8 @@
        real(kind=8),dimension(3,nat),intent(in)  ::  coord   ! 
        real(kind=8),intent(in)                   ::  step    ! 
        integer,dimension(4,nquad),intent(in)     ::  iquad   !
-       integer,intent(in)                        ::  nat     !
        integer,intent(in)                        ::  nquad   !
+       integer,intent(in)                        ::  nat     !
        integer,intent(in)                        ::  nstep   !
        integer,intent(in)                        ::  idx     !
 !
@@ -1556,7 +1562,7 @@
 !
 ! This subroutine 
 !
-       subroutine print_step1(bas,top,qmout,qmdir,nstiff,fpairs)
+       subroutine print_step1(bas,top,qmout,qmdir,nstiff,fpairs,fsymm)
 !
        use lengths,  only: leninp,lenline
        use units,    only: unijoyce,unitmp
@@ -1571,6 +1577,7 @@
        character(len=leninp),intent(in)          ::  qmdir   !
        integer,intent(in)                        ::  nstiff  !
        logical,intent(in)                        ::  fpairs  !
+       logical,intent(in)                        ::  fsymm   !
 !
 ! Local variables
 !
@@ -1591,13 +1598,14 @@
        write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
        write(unijoyce,'(A)') '$zero 1.d-12'
        write(unijoyce,'(A)') '$whess 5000. 2500.0'
-       if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
        write(unijoyce,*) 
+       if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
+       if ( fpairs ) write(unijoyce,*) 
        write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         & 
                                                           '_freqchk.agr'
        write(unijoyce,*) 
-       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
-       write(unijoyce,*) 
+       if ( fsymm ) write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
+       if ( fsymm ) write(unijoyce,*) 
        write(unijoyce,'(A)') '$dependence 1.2'
 !
        rewind(unitmp)
@@ -1624,27 +1632,39 @@
 !
 ! This subroutine 
 !
-       subroutine print_step2(bas,top,qmout,qmdir,nstiff,fpairs)
+       subroutine print_step2(bas,top,qmout,qmdir,nstiff,fpairs,       &
+                              fsymm,intop,bonded,dihe,nstep)
 !
-       use lengths,  only: leninp,lenline
-       use units,    only: unijoyce,unitmp
+       use lengths,   only: leninp,lenline
+       use units,     only: unijoyce,uniscr
+!
+       use datatypes,   only: grobonded,                               &
+                              dihedrals
 !
        implicit none
 !
 ! Input/output variables
 !
+       type(grobonded),intent(inout)             ::  bonded  !
+       type(dihedrals),intent(inout)             ::  dihe    !
        character(len=leninp),intent(in)          ::  bas     !
        character(len=leninp),intent(in)          ::  top     !
+       character(len=leninp),intent(in)          ::  intop   !
        character(len=leninp),intent(in)          ::  qmout   !
        character(len=leninp),intent(in)          ::  qmdir   !
+       integer,intent(in)                        ::  nstep   !
        integer,intent(in)                        ::  nstiff  !
        logical,intent(in)                        ::  fpairs  !
+       logical,intent(in)                        ::  fsymm   !
 !
 ! Local variables
 !
+       character(len=120)                        ::  cname   !
+       character(len=10)                         ::  cnum    !
        character(len=leninp)                     ::  qmfile  !
        character(len=lenline)                    ::  line    !
        integer                                   ::  io      !
+       integer                                   ::  i,j     !
 !
 ! Generating Joyce3 input (step1) 
 ! -------------------------------
@@ -1652,9 +1672,9 @@
        qmfile = adjustl(qmout)
        qmfile = qmfile(:len_trim(qmfile)-4)//'.fcc'
 !
-       open(unit=unijoyce,file='joyce.step1.inp',action='write')
+       open(unit=unijoyce,file='joyce.step2.inp',action='write')
 !
-       write(unijoyce,'(A)') '$title Target - Step 1'
+       write(unijoyce,'(A)') '$title Target - Step 2'
        write(unijoyce,'(A)') '$equil '//trim(qmdir)//trim(qmfile)
        write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
        write(unijoyce,'(A)') '$zero 1.d-12'
@@ -1666,22 +1686,107 @@
        write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         & 
                                                           '_torschk.agr'
        write(unijoyce,*) 
-       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
-       write(unijoyce,*) 
+       if ( fsymm ) then
+         write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%nflexi
+         write(unijoyce,*)
+       else
+         write(unijoyce,'(2(A,I4))') '$keepff ',nstiff+1,' - ',        &
+                                                      nstiff+dihe%nflexi
+         write(unijoyce,*)
+       end if
+!
+! Printing dependencies between flexible terms
+!
        write(unijoyce,'(A)') '$dependence 1.2'
 !
-       rewind(unitmp)
+       rewind(uniscr)
        do
-         read(unitmp,'(A)',iostat=io) line
+         read(uniscr,'(A)',iostat=io) line
          if ( io /= 0 ) exit
          write(unijoyce,'(A)') trim(line)
+       end do
+!
+       write(unijoyce,'(A)') '$end'
+       write(unijoyce,*) 
+!
+! If reference topology is supplied print assignments
+!
+       if ( len_trim(intop) .gt. 0 ) then
+         write(unijoyce,'(A)') '$assign' 
+!
+         do i = 1, bonded%nbond
+           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+             bonded%sbond(i),'=',bonded%kbond(i),trim(bonded%labbond(i))
+         end do
+!
+         do i = 1, bonded%nang
+           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+                bonded%sang(i),'=',bonded%kang(i),trim(bonded%labang(i))
+         end do
+!
+         do i = 1, dihe%nrigid
+           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+                dihe%srigid(i),'=',dihe%krigid(i),trim(dihe%labrigid(i))
+         end do
+!
+         do i = 1, dihe%ninv
+           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+                      dihe%sinv(i),'=',dihe%kinv(i),trim(dihe%labinv(i))
+         end do
+!
+         do i = 1, dihe%nimpro
+           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+                dihe%simpro(i),'=',dihe%kimpro(i),trim(dihe%labimpro(i))
+         end do
+!
+         write(unijoyce,'(A)') '$end'
+         write(unijoyce,*) 
+       end if
+!
+! Printing dihedral scan information
+!
+       write(unijoyce,'(A)') '$geom'
+!
+       do i = 1, dihe%nquad
+!
+         write(cnum,'(I2.2)') i
+         cnum  = adjustl(cnum)
+         cname = trim(qmdir)//trim(bas)//'_scan-'//trim(cnum)
+!
+         write(unijoyce,'(A,4I4)') trim(cname)//'_0001.fchk'//         &
+                              '  5.0  0.0  0.0  0.0  ; ',dihe%iquad(:,i)
+!
+         do j = 1, nstep
+           write(cnum,'(I4.4)') j+1
+           cnum  = adjustl(cnum)
+           write(unijoyce,'(A)') trim(cname)//'_'//trim(cnum)//        &
+                                         '.fchk  5.0  0.0  0.0  0.0  -f'
+         end do
+!
+       end do
+!
+       write(unijoyce,'(A)') '$end'
+       write(unijoyce,*) 
+!
+! Printing validation files
+!
+       do i = 1, dihe%nquad
+!
+         write(cnum,'(I2.2)') i
+         cnum  = adjustl(cnum)
+!
+         write(unijoyce,'(A)') '$scan '//trim(bas)//'.joyce.scan'//    &
+                                                      trim(cnum)//'.dat'
+         write(unijoyce,'(4I4,A)') dihe%iquad(:,i),' ; -180. 180. 1.'
+         write(unijoyce,'(A)') '$end'
+!
        end do
 !
 ! Closing output files
 ! --------------------
 !
-       write(unijoyce,'(A)') '$end'
        write(unijoyce,*)
+       write(unijoyce,'(A)') 'end-of-file'
 !
        close(unijoyce)
 !

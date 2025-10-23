@@ -637,8 +637,8 @@
 !
        do i = 1, dihe%nquad
          vaux(:) = dihe%iquad(:,i)
-         iddihe(i) = idat(vaux(1))*nidat**3 + idat(vaux(2))*nidat**2   &
-                                   + idat(vaux(3))*nidat + idat(vaux(4))
+         iddihe(i) = min(idat(vaux(2)),idat(vaux(3)))*nidat            &
+                     + max(idat(vaux(2)),idat(vaux(3)))
        end do
 !
        visited(:) = .FALSE.

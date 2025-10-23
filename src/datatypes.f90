@@ -97,6 +97,7 @@
        end type grobonded
 !
        type torsion
+         character(len=50)                          ::  labtor   !
          real(kind=8)                               ::  vtor     !  Torsional potential
          real(kind=8)                               ::  phase    !  Phase
          integer                                    ::  stor     !  

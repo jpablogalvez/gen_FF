@@ -3,7 +3,7 @@
        module genforcefield
 !
        use lengths,       only:  leninp,lenlab
-       use units,         only:  uniic,unideps,unitmp,unidihe,         &
+       use units,         only:  uniic,unideps,unitmp,uniscr,unidihe,  &
                                  unijoyce,uninb,unitop,unicorr
 !
        implicit none
@@ -970,6 +970,7 @@
 !
 ! Local variables
 !  
+       character(len=20)                                ::  cnum      !
        real(kind=8)                                     ::  daux      !
        integer,dimension(:),allocatable                 ::  ivaux     !
        integer,dimension(4)                             ::  vaux      !
@@ -980,7 +981,7 @@
 !
        real(kind=8),parameter                           ::  pi =  4*atan(1.0_8) 
 !
-! Symmetrizing bonded terms
+! Symmetrizing bonded terms ! TODO: option to reorder dihedral atoms
 ! -------------------------
 !
 !  Finding equivalent bond-stretching terms
@@ -1111,32 +1112,45 @@
               + max(idat(vaux(2)),idat(vaux(3)))
 !
          dihed%idflexi(i) = iaux  
+!
+!
+         dihed%labflexi(i) = trim(newlab(dihed%iflexi(1,i)))//'-'//    &
+                             trim(newlab(dihed%iflexi(2,i)))//'-'//    &
+                             trim(newlab(dihed%iflexi(3,i)))//'-'//    &
+                             trim(newlab(dihed%iflexi(4,i))) 
        end do
 !
        do i = 1, dihed%nflexi
          do j = 1, dihed%flexi(i)%ntor
            iterm = iterm + 1
            dihed%flexi(i)%tor(j)%stor = iterm
+!
+           write(cnum,*) dihed%flexi(i)%tor(j)%multi
+           cnum = adjustl(cnum)
+           dihed%flexi(i)%tor(j)%labtor = trim(dihed%labflexi(i))//    &
+                                                       '_n='//trim(cnum)
          end do
        end do
 !
        ivaux(:) = dihed%idrigid(:)
-       call inormlabels(dihed%nrigid,ivaux(:dihed%nrigid),dihed%idrigid(:dihed%nrigid),iaux)
+       call inormlabels(dihed%nrigid,ivaux(:dihed%nrigid),             &
+                        dihed%idrigid(:dihed%nrigid),iaux)
 !
        ivaux(:) = dihed%idimpro(:)
-       call inormlabels(dihed%nimpro,ivaux(:dihed%nimpro),dihed%idimpro(:dihed%nimpro),iaux)
+       call inormlabels(dihed%nimpro,ivaux(:dihed%nimpro),             &
+                        dihed%idimpro(:dihed%nimpro),iaux)
 !
        ivaux(:) = dihed%idinv(:)
-       call inormlabels(dihed%ninv,ivaux(:dihed%ninv),dihed%idinv(:dihed%ninv),iaux)
+       call inormlabels(dihed%ninv,ivaux(:dihed%ninv),                 &
+                        dihed%idinv(:dihed%ninv),iaux)
 !
        ivaux(:) = dihed%idflexi(:)
-       call inormlabels(dihed%nflexi,ivaux(:dihed%nflexi),dihed%idflexi(:dihed%nflexi),iaux)
+       call inormlabels(dihed%nflexi,ivaux(:dihed%nflexi),             &
+                        dihed%idflexi(:dihed%nflexi),iaux)
 !
 ! Symmetrizing dihedral terms
 !
-! FIXME: problem symmetrizing -179 and 179 dihedrals
-!
-!~        if ( dihed%nrigid .gt. 0 ) then
+!~        if ( dihed%nrigid .gt. 0 ) then ! TODO: problem symmetrizing -179 and 179 dihedrals
 !~          call symdihe(dihed%nrigid,dihed%idrigid,dihed%drigid,dihed%srigid,dihed%labrigid,.TRUE.,fsymm,debug)
 !~        end if 
 !~ !
@@ -1145,19 +1159,21 @@
 !~        end if 
 !
        if ( (dihed%nrigid+dihed%nimpro) .gt. 0 ) then
-         call setdeps(nat,r,idat,dihed%nrigid+dihed%nimpro,dihed%nrigid,      &
-                      dihed%irigid,dihed%idrigid,dihed%drigid,dihed%srigid,   &
-                      dihed%labrigid,dihed%nimpro,dihed%iimpro,dihed%idimpro, &
-                      dihed%dimpro,dihed%simpro,dihed%labimpro,               &
-                      marunit,narunit,arunit,adj,lheavy,.TRUE.,fsymm,debug)
+         call setdeps(nat,r,idat,dihed%nrigid+dihed%nimpro,            &
+                      dihed%nrigid,dihed%irigid,dihed%idrigid,         &
+                      dihed%drigid,dihed%srigid,dihed%labrigid,        &
+                      dihed%nimpro,dihed%iimpro,dihed%idimpro,         &
+                      dihed%dimpro,dihed%simpro,dihed%labimpro,        &
+                      marunit,narunit,arunit,adj,lheavy,fsymm,debug)
        end if
 !
        if ( dihed%ninv .gt. 0 ) then
-         call symdihe(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,dihed%labinv,.TRUE.,fsymm,debug)
+         call symoop(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,     &
+                     dihed%labinv,fsymm,debug)
        end if 
 !
        if ( dihed%nflexi .gt. 0 ) then
-         call symdihe(dihed%nflexi,dihed%idflexi,dihed%dflexi,dihed%sflexi,dihed%labflexi,.FALSE.,fsymm,debug)
+         call symtor(dihed%nflexi*10,dihed)
        end if
 !
        deallocate(ivaux)
@@ -2236,8 +2252,12 @@
            do j = 1, nagg(i)
 !
              do l = k+2, k+i
-               write(unideps,'(3X,I4,1X,A,1X,I4,A)') sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0 ; '//trim(labbond(mol(l)))
-               write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0 ; '//trim(labbond(mol(l)))
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
+                      sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0 ; '//   &
+                   trim(labbond(mol(l)))//' = '//trim(labbond(mol(k+1)))
+               write(unitmp,'(3X,I4,1X,A,1X,I4,A)')                    &
+                      sbond(mol(l)),'=',sbond(mol(k+1)),'*1.d0 ; '//   & 
+                   trim(labbond(mol(l)))//' = '//trim(labbond(mol(k+1)))
              end do
 !
              k = k + i
@@ -2245,25 +2265,6 @@
            end do
          end if
        end do
-!
-!~        if ( debug ) then
-!~          write(*,*) 'Equivalence matrix information'
-!~          write(*,*) '------------------------------'
-!~          write(*,'(2X,A,X,I6)')     'Total number of entities : ',magg
-!~          write(*,*)
-!~          write(*,'(2X,A,20(X,I6))') 'Aggregates of each type  : ',     &
-!~                                                             nagg(:nsize)
-!~          write(*,'(2X,A,20(X,I6))') '  Accumulation           : ',     &
-!~                                                             iagg(:nsize)
-!~          write(*,*)
-!~          write(*,'(2X,A,20(X,I6))') 'Molecules of each type   : ',     &
-!~                                                             nmol(:nsize)
-!~          write(*,'(2X,A,20(X,I6))') '  Accumulation           : ',     &
-!~                                                             imol(:nsize)
-!~          write(*,*)
-!~ !
-!~          call print_info(0,nbond,agg,tag,mol,'agg','tag','mol')
-!~        end if
 !
        return
        end subroutine symterm
@@ -2274,8 +2275,7 @@
 !
 ! This subroutine 
 !
-       subroutine symdihe(ndihe,iddihe,ddihe,sdihe,labdihe,            &
-                          ftmp,fsymm,debug)
+       subroutine symoop(ndihe,iddihe,ddihe,sdihe,labdihe,fsymm,debug)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2289,7 +2289,6 @@
        integer,dimension(ndihe),intent(out)           ::  iddihe  !
        integer,dimension(ndihe),intent(in)            ::  sdihe   !
        integer,intent(in)                             ::  ndihe   !  
-       logical,intent(in)                             ::  ftmp    !  
        logical,intent(in)                             ::  fsymm   ! 
        logical,intent(in)                             ::  debug   !
 !
@@ -2325,9 +2324,7 @@
 !
        do i = 1, ndihe
          do j = 1, i
-           if ( iddihe(i) .eq. iddihe(j)  ) then ! TODO: cis/trans dihedrals have different type
-!           if ( (iddihe(i).eq.iddihe(j)) .and.                         &
-!                                  (abs(ddihe(i)-ddihe(j)).lt.thr) ) then
+           if ( iddihe(i) .eq. iddihe(j)  ) then
              adj(i,j) = .TRUE.
              adj(j,i) = .TRUE.
            end if
@@ -2345,7 +2342,7 @@
          if ( nagg(i) .ne. 0 ) then
            do j = 1, nagg(i)
 !
-!             daux = 0
+!             daux = 0     ! TODO: symmetrize absolute value but keep sign
 !             do l = k+1, k+i
 !                daux = daux + ddihe(mol(l))
 !             end do
@@ -2356,10 +2353,12 @@
 !             end do
 !
              do l = k+2, k+i
-               write(unideps,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; ' &
-                                                //trim(labdihe(mol(k+1)))
-               if ( ftmp ) write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; ' &
-                                                //trim(labdihe(mol(k+1)))
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
+                      sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; '//   &
+                   trim(labdihe(mol(l)))//' = '//trim(labdihe(mol(k+1)))
+               write(unitmp,'(3X,I4,1X,A,1X,I4,A)')                    &
+                      sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; '//   &
+                   trim(labdihe(mol(l)))//' = '//trim(labdihe(mol(k+1)))
              end do
 !
              k = k + i
@@ -2368,27 +2367,114 @@
          end if
        end do
 !
-!~        if ( debug ) then
-!~          write(*,*) 'Equivalence matrix information'
-!~          write(*,*) '------------------------------'
-!~          write(*,'(2X,A,X,I6)')     'Total number of entities : ',magg
-!~          write(*,*)
-!~          write(*,'(2X,A,20(X,I6))') 'Aggregates of each type  : ',     &
-!~                                                             nagg(:nsize)
-!~          write(*,'(2X,A,20(X,I6))') '  Accumulation           : ',     &
-!~                                                             iagg(:nsize)
-!~          write(*,*)
-!~          write(*,'(2X,A,20(X,I6))') 'Molecules of each type   : ',     &
-!~                                                             nmol(:nsize)
-!~          write(*,'(2X,A,20(X,I6))') '  Accumulation           : ',     &
-!~                                                             imol(:nsize)
-!~          write(*,*)
+       return
+       end subroutine symoop
+!
+!======================================================================!
+!
+! SYMTOR - SYMmetrizing force field TORsions
+!
+! This subroutine 
+!
+       subroutine symtor(ndihe,dihe)
+!
+       use datatypes,  only:  dihedrals
+!
+       use printings
+       use graphtools, only:  inormlabels
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(in)                     ::  dihe    !
+       integer,intent(in)                             ::  ndihe   !  
+!
+! Local variables
+!
+       character(len=50),dimension(ndihe)             ::  labdihe  !
+       logical,dimension(ndihe)                       ::  lquad    !
+       integer,dimension(4,ndihe)                     ::  idihe    !
+       integer,dimension(ndihe)                       ::  sdihe    !
+       integer,dimension(ndihe)                       ::  mdihe    !
+       integer,dimension(ndihe)                       ::  iddihe   !
+       integer,dimension(ndihe)                       ::  ivaux    !
+       integer                                        ::  niddihe  !
+       integer                                        ::  nterm    !
+       integer                                        ::  i,j,k    !
+!
+       real(kind=8)                                   ::  thr = 5.0d0
+!
+!  Symmetrizing flexible dihedrals
+! --------------------------------
+!
+! Generating unique representation with all torsions
+!
+       k = 0
+       do i = 1, dihe%nflexi
+         do j = 1, dihe%flexi(i)%ntor
+           k = k + 1
+!
+           sdihe(k)   = dihe%flexi(i)%tor(j)%stor
+           mdihe(k)   = dihe%flexi(i)%tor(j)%multi
+           idihe(:,k) = dihe%flexi(i)%itor(:)
+           labdihe(k) = dihe%flexi(i)%tor(j)%labtor 
+!
+           ivaux(k) = dihe%idflexi(i)*10 + mdihe(k)
+!~ write(*,*) k,trim(labdihe(k)),dihe%idflexi(i),mdihe(k),ivaux(k)
+!
+         end do
+       end do
+       nterm = k
+!
+       call inormlabels(ndihe,ivaux,iddihe,niddihe)
+!~        k = 0
+!~        do i = 1, dihe%nflexi
+!~          do j = 1, dihe%flexi(i)%ntor
+!~            k = k + 1
 !~ !
-!~          call print_info(0,ndihe,agg,tag,mol,'agg','tag','mol')
-!~        end if
+!~ write(*,*)'normalized', k,trim(labdihe(k)),dihe%idflexi(i),mdihe(k),iddihe(k)
+!~ !
+!~          end do
+!~        end do
+!
+! Finding position of principal quadruplets in the new list
+!
+       lquad(:) = .FALSE.
+       do i = 1, dihe%nquad
+         do j = 1, nterm
+           if ( lquad(j) ) cycle
+           if ( (idihe(1,j).eq.dihe%iquad(1,i))                        &
+                 .and. (idihe(2,j).eq.dihe%iquad(2,i))                 &
+                 .and. (idihe(3,j).eq.dihe%iquad(3,i))                 &
+                 .and. (idihe(4,j).eq.dihe%iquad(4,i)) ) then                 
+             lquad(j) = .TRUE.
+           end if
+         end do
+       end do
+!
+! Printing equivalent dihedral terms with same identifier based on 
+!  atomtypes and multiplicities 
+!
+       do i = 1, nterm
+         if ( lquad(i) ) then
+           do j = 1, nterm
+             if ( lquad(j) ) cycle
+             if ( iddihe(i) .eq. iddihe(j) ) then
+!~ write(*,*) 'matching',i,iddihe(i),'with',j,iddihe(j)
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
+                                  sdihe(j),'=',sdihe(i),'*1.d0 ; '//   &
+                               trim(labdihe(j))//' = '//trim(labdihe(i))
+               write(uniscr,'(3X,I4,1X,A,1X,I4,A)')                    &
+                                  sdihe(j),'=',sdihe(i),'*1.d0 ; '//   &
+                               trim(labdihe(j))//' = '//trim(labdihe(i))
+             end if
+           end do
+         end if
+       end do
 !
        return
-       end subroutine symdihe
+       end subroutine symtor
 !
 !======================================================================!
 !
@@ -2396,10 +2482,10 @@
 !
 ! This subroutine 
 !
-       subroutine setdeps(nat,r,idat,ndihe,nrigid,irigid,idrigid,drigid,srigid,   &
-                           labrigid,nimpro,iimpro,idimpro,dimpro,simpro,      & 
-                           labimpro,marunit,narunit,arunit,adj,lheavy,        &
-                           ftmp,fsymm,debug)
+       subroutine setdeps(nat,r,idat,ndihe,nrigid,irigid,idrigid,      &
+                           drigid,srigid,labrigid,nimpro,iimpro,       & 
+                           idimpro,dimpro,simpro,labimpro,marunit,     &
+                           narunit,arunit,adj,lheavy,fsymm,debug)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2429,7 +2515,6 @@
        integer,intent(in)                              ::  marunit   !    
        logical,dimension(nat,nat),intent(in)           ::  adj       !
        logical,dimension(nat),intent(in)               ::  lheavy    !
-       logical,intent(in)                              ::  ftmp      !  
        logical,intent(in)                              ::  fsymm     !   
        logical,intent(in)                              ::  debug     !
 !
@@ -2483,7 +2568,7 @@
 ! Generating unique representation with rigid and improper dihedrals
 !
        do i = 1, nrigid
-         ivaux(i)   = idrigid(i)*ndihe + 1
+         ivaux(i)   = idrigid(i)*2 + 1
          sdihe(i)   = srigid(i)
          ddihe(i)   = drigid(i)
          idihe(:,i) = irigid(:,i)
@@ -2491,7 +2576,7 @@
        end do
 !
        do i = 1, nimpro
-         ivaux(nrigid+i)   = idimpro(i)*ndihe + 2
+         ivaux(nrigid+i)   = idimpro(i)*2 + 2
          sdihe(nrigid+i)   = simpro(i)
          ddihe(nrigid+i)   = dimpro(i)
          idihe(:,nrigid+i) = iimpro(:,i)
@@ -2789,10 +2874,12 @@
            do j = 1, nagg(i)
 !
              do l = k+2, k+i
-               write(unideps,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; ' &
-                                                 //trim(labdihe(mol(l)))
-               if ( ftmp ) write(unitmp,'(3X,I4,1X,A,1X,I4,A)') sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; ' &
-                                                 //trim(labdihe(mol(l)))
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
+                      sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; '//   &
+                   trim(labdihe(mol(l)))//' = '//trim(labdihe(mol(k+1)))
+               write(unitmp,'(3X,I4,1X,A,1X,I4,A)')                    &
+                      sdihe(mol(l)),'=',sdihe(mol(k+1)),'*1.d0 ; '//   &
+                   trim(labdihe(mol(l)))//' = '//trim(labdihe(mol(k+1)))
              end do
 !
              k = k + i
