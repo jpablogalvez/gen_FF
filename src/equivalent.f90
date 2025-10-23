@@ -648,8 +648,9 @@
 !
        if ( fqmout ) then
 !
+         allocate(lch3(dihe%ndihe))
          call genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,      &
-                          znum,top%bonded,dihe,iroute,debug)
+                          lch3,znum,top%bonded,dihe,iroute,debug)
 !
        else
 !
@@ -682,6 +683,11 @@
 !
          call genquad(nat,znum,dihe,dihe%ndihe)
 !
+! Finding quadruplets associated to CH3 rotations
+!
+         allocate(lch3(dihe%ndihe))
+         call genmethlist(nat,adj,znum,dihe,dihe%ndihe,lch3)
+!
 ! TODO: check if equilibrium distances should be taken from external geometry
 !
        end if
@@ -690,11 +696,6 @@
                         top%bonded%nang +                              &
                         dihe%nimpro + dihe%ninv + dihe%nrigid
        reftop%nsoft   = dihe%nflexi
-!
-! Finding quadruplets associated to CH3 rotations
-!
-       allocate(lch3(dihe%nflexi))
-!~        call genmethlist()
 !
 ! Symmetrizing force field terms
 ! ------------------------------
