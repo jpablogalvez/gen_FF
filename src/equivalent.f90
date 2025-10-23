@@ -648,7 +648,6 @@
 !
        if ( fqmout ) then
 !
-         allocate(lch3(dihe%ndihe))
          call genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,      &
                           lch3,znum,top%bonded,dihe,iroute,debug)
 !

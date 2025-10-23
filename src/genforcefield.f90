@@ -629,7 +629,7 @@
        logical,dimension(nat,nat),intent(in)              ::  adj       !  Boolean adjacency 
        logical,dimension(nat,nat),intent(in)              ::  lcycle    !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)              ::  lrigid    ! 
-       logical,dimension(nat),intent(out)                 ::  lch3      ! 
+       logical,dimension(:),allocatable,intent(out)       ::  lch3      ! 
 !
        integer,dimension(nat),intent(in)                  ::  znum      !  
        integer,intent(in)                                 ::  nidat     !
@@ -834,7 +834,7 @@
        logical,dimension(nat,nat),intent(in)              ::  adj      !
        logical,dimension(nat,nat),intent(in)              ::  lcycle   !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)              ::  lrigid   !  Rigid bonds
-       logical,dimension(nat),intent(out)                 ::  lch3     !
+       logical,dimension(:),allocatable,intent(out)     ::  lch3     !
        integer,dimension(nat),intent(in)                  ::  idat     ! 
        integer,dimension(nat),intent(in)                  ::  znum     ! 
        integer,intent(in)                                 ::  nat      !  Number of atoms
@@ -903,6 +903,8 @@
        dihed%dflexi(:)   = 0.0d0
        dihed%kflexi(:)   = 0.0d0
        dihed%nflexi      = 0
+!
+       allocate(lch3(ndihe))
 !
        allocate(edges(2,ndihe))
 !
@@ -1309,55 +1311,55 @@
 !
 ! Input/output variables
 !
-       type(dihedrals),intent(inout)              ::  dihed     !                            
-       real(kind=8),dimension(3,nat),intent(in)   ::  coord     !
-       logical,dimension(nat,nat),intent(in)      ::  adj       !
-       logical,dimension(nat,nat),intent(in)      ::  lcycle    !  Bonds belonging to rings
-       logical,dimension(nat,nat),intent(in)      ::  lrigid    !  Bonds belonging to rings
-       logical,dimension(nat),intent(out)         ::  lch3      !
-       integer,dimension(nat),intent(in)          ::  idat      ! 
-       integer,dimension(nat),intent(in)          ::  znum      ! 
-       integer,intent(in)                         ::  nidat     !
-       integer,intent(in)                         ::  nat       !
+       type(dihedrals),intent(inout)             ::  dihed     !                            
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord     !
+       logical,dimension(nat,nat),intent(in)     ::  adj       !
+       logical,dimension(nat,nat),intent(in)     ::  lcycle    !  Bonds belonging to rings
+       logical,dimension(nat,nat),intent(in)     ::  lrigid    !  Bonds belonging to rings
+       logical,dimension(ndihe),intent(out)      ::  lch3      !
+       integer,dimension(nat),intent(in)         ::  idat      ! 
+       integer,dimension(nat),intent(in)         ::  znum      ! 
+       integer,intent(in)                        ::  nidat     !
+       integer,intent(in)                        ::  nat       !
 !
-       integer,dimension(2,nbond),intent(in)      ::  ibond     !  
-       integer,intent(in)                         ::  nbond     !
+       integer,dimension(2,nbond),intent(in)     ::  ibond     !  
+       integer,intent(in)                        ::  nbond     !
 !
-       integer,dimension(2,nang),intent(in)       ::  edgeang   !  
-       integer,dimension(3,nang),intent(in)       ::  iang      !  
-       integer,intent(in)                         ::  nang      !
+       integer,dimension(2,nang),intent(in)      ::  edgeang   !  
+       integer,dimension(3,nang),intent(in)      ::  iang      !  
+       integer,intent(in)                        ::  nang      !
 !
-       integer,dimension(2,ndihe),intent(in)      ::  edgedihe  !  
-       integer,intent(in)                         ::  ndihe     ! 
-!
-       integer,intent(in)                         ::  iroute    ! 
+       integer,dimension(2,ndihe),intent(in)     ::  edgedihe  !  
+       integer,intent(in)                        ::  ndihe     ! 
+!     
+       integer,intent(in)                        ::  iroute    ! 
 !
 ! Local variables
 !  
-       real(kind=8),dimension(ndihe)              ::  dimpro    !
-       integer,dimension(4,ndihe)                 ::  iimpro    !
-       integer,dimension(ndihe)                   ::  fimpro    !
-       integer                                    ::  nimpro    !
-       real(kind=8),dimension(ndihe)              ::  dinv      !
-       integer,dimension(4,ndihe)                 ::  iinv      !
-       integer,dimension(ndihe)                   ::  finv      !
-       integer                                    ::  ninv      !
-       logical,dimension(ndihe)                   ::  torsion   !
-       logical,dimension(4)                       ::  lcheck    !
-       logical                                    ::  flag      !
-       logical                                    ::  lfound    !
-       real(kind=8)                               ::  daux      !
-       integer,dimension(4)                       ::  vaux      !  
-       integer,dimension(4)                       ::  vaux1     !  
-       integer,dimension(4)                       ::  vaux2     ! 
-       integer,dimension(2,4)                     ::  bonds     !
-       integer,dimension(2)                       ::  rbond     !
-       integer,dimension(3)                       ::  ang1      !
-       integer,dimension(3)                       ::  ang2      !
-       integer                                    ::  id1       !
-       integer                                    ::  id2       !
-       integer                                    ::  itmp      !
-       integer                                    ::  i,j,k     !  Indexes
+       real(kind=8),dimension(ndihe)             ::  dimpro    !
+       integer,dimension(4,ndihe)                ::  iimpro    !
+       integer,dimension(ndihe)                  ::  fimpro    !
+       integer                                   ::  nimpro    !
+       real(kind=8),dimension(ndihe)             ::  dinv      !
+       integer,dimension(4,ndihe)                ::  iinv      !
+       integer,dimension(ndihe)                  ::  finv      !
+       integer                                   ::  ninv      !
+       logical,dimension(ndihe)                  ::  torsion   !
+       logical,dimension(4)                      ::  lcheck    !
+       logical                                   ::  flag      !
+       logical                                   ::  lfound    !
+       real(kind=8)                              ::  daux      !
+       integer,dimension(4)                      ::  vaux      !  
+       integer,dimension(4)                      ::  vaux1     !  
+       integer,dimension(4)                      ::  vaux2     ! 
+       integer,dimension(2,4)                    ::  bonds     !
+       integer,dimension(2)                      ::  rbond     !
+       integer,dimension(3)                      ::  ang1      !
+       integer,dimension(3)                      ::  ang2      !
+       integer                                   ::  id1       !
+       integer                                   ::  id2       !
+       integer                                   ::  itmp      !
+       integer                                   ::  i,j,k     !  Indexes
 !
        real(kind=8),parameter                    ::  pi =  4*atan(1.0_8) 
 !
@@ -1676,6 +1678,7 @@
 ! ----------------------------------------------------
 !
        call genquad(nat,znum,dihed,ndihe)
+!
        call genmethlist(nat,adj,znum,dihed,dihed%ndihe,lch3)
 !
 ! TODO: option to keep only one quadruplet per torsion
