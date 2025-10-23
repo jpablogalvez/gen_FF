@@ -151,6 +151,7 @@
          integer                                    ::  nrigid   !
          integer                                    ::  nimpro   !
          integer                                    ::  ninv     !
+         integer                                    ::  ntor     !
          integer                                    ::  nidflexi !
          integer                                    ::  nidrigid !
          integer                                    ::  nidimpro !

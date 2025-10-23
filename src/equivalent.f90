@@ -89,6 +89,7 @@
        logical,dimension(:,:),allocatable              ::  laroma   !  Double/triple bonds       
        logical,dimension(:),allocatable                ::  lheavy   !  Heavy atom       
        logical,dimension(:),allocatable                ::  latar    !  Aromatic atom       
+       logical,dimension(:),allocatable                ::  lch3     !  Methyl rotation       
 ! 
 ! Topology information
 !
@@ -389,6 +390,8 @@
 ! Computing graph properties
 ! -------------------------- 
 !
+! Generating list with heavy atoms
+! 
        call genheavylist(nat,mass,lheavy)
 !
 !   Computing degrees
@@ -679,6 +682,8 @@
 !
          call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
+         call genquad(nat,znum,dihe,dihe%ndihe)
+!
 ! TODO: check if equilibrium distances should be taken from external geometry
 !
        end if
@@ -687,6 +692,11 @@
                         top%bonded%nang +                              &
                         dihe%nimpro + dihe%ninv + dihe%nrigid
        reftop%nsoft   = dihe%nflexi
+!
+! Finding quadruplets associated to CH3 rotations
+!
+       allocate(lch3(dihe%nflexi))
+!~        call genmethlist()
 !
 ! Symmetrizing force field terms
 ! ------------------------------
@@ -1692,11 +1702,11 @@
                                                           '_torschk.agr'
        write(unijoyce,*) 
        if ( fsymm ) then
-         write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%nflexi
+         write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%ntor
          write(unijoyce,*)
        else
          write(unijoyce,'(2(A,I4))') '$keepff ',nstiff+1,' - ',        &
-                                                      nstiff+dihe%nflexi
+                                                        nstiff+dihe%ntor
          write(unijoyce,*)
        end if
 !

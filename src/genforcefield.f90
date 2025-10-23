@@ -1120,10 +1120,13 @@
                              trim(newlab(dihed%iflexi(4,i))) 
        end do
 !
+       dihed%ntor = 0
        do i = 1, dihed%nflexi
          do j = 1, dihed%flexi(i)%ntor
            iterm = iterm + 1
            dihed%flexi(i)%tor(j)%stor = iterm
+!
+           dihed%ntor = dihed%ntor + 1
 !
            write(cnum,*) dihed%flexi(i)%tor(j)%multi
            cnum = adjustl(cnum)
@@ -1344,7 +1347,6 @@
 !
 ! Local variables
 !  
-       type(dihedrals)                            ::  tmpdi     !                            
        real(kind=8),dimension(ndihe)              ::  dimpro    !
        integer,dimension(4,ndihe)                 ::  iimpro    !
        integer,dimension(ndihe)                   ::  fimpro    !
@@ -1362,14 +1364,10 @@
        real(kind=8)                               ::  daux1     !
        real(kind=8)                               ::  daux2     !
        integer,dimension(4,ndihe)                 ::  auxdihe   !  
-       integer,dimension(ndihe)                   ::  neqquad   !  
-       integer                                    ::  meqquad   !  
-       integer,dimension(ndihe)                   ::  imap      !  
-       integer,dimension(ndihe)                   ::  iflexi    !  
        integer,dimension(ndihe)                   ::  ivaux     !  
        integer,dimension(4)                       ::  vaux      !  
        integer,dimension(4)                       ::  vaux1     !  
-       integer,dimension(4)                       ::  vaux2     !  
+       integer,dimension(4)                       ::  vaux2     ! 
        integer,dimension(2,4)                     ::  bonds     !
        integer,dimension(2)                       ::  rbond     !
        integer,dimension(2)                       ::  bond1     !
@@ -1378,7 +1376,6 @@
        integer,dimension(2)                       ::  bond4     !
        integer,dimension(3)                       ::  ang1      !
        integer,dimension(3)                       ::  ang2      !
-       integer                                    ::  nmap      !
        integer                                    ::  id1       !
        integer                                    ::  id2       !
        integer                                    ::  id11      !
@@ -1711,167 +1708,7 @@
 ! Generating Fourier series for each flexible dihedral
 ! ----------------------------------------------------
 !
-! Sorting flexible dihedrals by central bond
-!
-       allocate(tmpdi%iflexi(4,ndihe),tmpdi%dflexi(ndihe),             &
-                tmpdi%fflexi(ndihe))
-!
-       visited(:) = .FALSE.
-! 
-       neqquad(:) = 0
-       meqquad = 0
-!
-       k = 0
-       do i = 1, dihed%nflexi
-         if ( visited(i) ) cycle 
-!
-         meqquad = meqquad + 1
-         neqquad(meqquad) = neqquad(meqquad) + 1
-!
-         k = k + 1
-         tmpdi%iflexi(:,k) = dihed%iflexi(:,i)
-         tmpdi%fflexi(k)   = dihed%fflexi(i)
-         tmpdi%dflexi(k)   = dihed%dflexi(i)
-!
-         vaux1(:) = dihed%iflexi(:,i)
-         visited(i) = .TRUE.
-!
-         do j = 1, dihed%nflexi
-           if ( visited(j) ) cycle
-!
-           vaux2(:) = dihed%iflexi(:,j) 
-!
-           if ( ((vaux1(2).eq.vaux2(2)).and.(vaux1(3).eq.vaux2(3))) .or. &
-                ((vaux1(2).eq.vaux2(3)).and.(vaux1(3).eq.vaux2(2))) ) then
-             neqquad(meqquad) = neqquad(meqquad) + 1
-             visited(j) = .TRUE.
-             k = k + 1
-             tmpdi%iflexi(:,k) = dihed%iflexi(:,j)
-             tmpdi%fflexi(k)   = dihed%fflexi(j)
-             tmpdi%dflexi(k)   = dihed%dflexi(j)             
-           end if
-! 
-         end do
-       end do
-!
-       imap(:) = -1
-!
-       k = 0
-       do i = 1, meqquad
-!
-! Removing H-related dihedrals if possible
-!
-         nmap = 0
-!
-         flag = .TRUE.
-         do j = 1, neqquad(i)
-           vaux(:) = tmpdi%iflexi(:,k+j)
-           if ( (znum(vaux(1)).ne.1).and.(znum(vaux(4)).ne.1) ) then 
-             imap(nmap+1) = k + j
-             nmap = nmap + 1
-           end if
-         end do        
-!
-         if ( nmap .eq. 0 ) then
-           flag = .TRUE.
-           do j = 1, neqquad(i)
-             vaux(:) = tmpdi%iflexi(:,k+j)
-             if ( (znum(vaux(1)).ne.1).or.(znum(vaux(4)).ne.1) ) then 
-               imap(nmap+1) = k + j
-               nmap = nmap + 1
-             end if
-           end do  
-         end if
-!
-         if ( nmap .eq. 0 ) then
-           flag = .TRUE.
-           do j = 1, neqquad(i)
-             vaux(:) = tmpdi%iflexi(:,k+j)
-             if ( (znum(vaux(1)).eq.1).and.(znum(vaux(4)).eq.1) ) then 
-               imap(nmap+1) = k + j
-               nmap = nmap + 1
-             end if
-           end do  
-         end if
-!
-! Find leading quadruplet
-!
-         flag = .FALSE.
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.70.0d0) .and. (daux.le.105.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.35.0d0) .and. (daux.le.70.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.105.0d0) .and. (daux.le.150.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         k = k + neqquad(i)
-!
-         neqquad(i) = nmap
-!
-       end do
-!
-! Storing information of selected quadruplets
-!
-       dihed%nquad = meqquad
-       allocate(dihed%iquad(4,meqquad),dihed%dquad(meqquad),           &
-                dihed%fquad(meqquad),dihed%mapquad(meqquad))
-!
-       do i = 1, meqquad
-         dihed%iquad(:,i) = tmpdi%iflexi(:,iflexi(i))
-         dihed%dquad(i)   = tmpdi%dflexi(iflexi(i))
-         dihed%fquad(i)   = tmpdi%fflexi(iflexi(i))
-         dihed%mapquad(i) = iflexi(i)
-       end do
+       call genquad(nat,znum,dihed,ndihe)
 !
 ! TODO: option to keep only one quadruplet per torsion
 !

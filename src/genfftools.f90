@@ -12,6 +12,8 @@
        public  ::  genrigidlist,                                       &
                    gencyclelist,                                       &
                    genheavylist,                                       &
+                   genmethlist,                                        &
+                   genquad,                                            &
                    findarcycles,                                       &
                    bonded2dihe,                                        &
                    selectquad,                                         &
@@ -219,6 +221,75 @@
 !
        return
        end subroutine genheavylist
+!
+!======================================================================!
+!
+! GENMETHLIST - GENerate METHyl LIST
+!
+! This subroutine 
+!
+       subroutine genmethlist(nat,adj,znum,dihe,nflexi,lch3)
+!
+       use datatypes,  only:  dihedrals
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(in)             ::  dihe    !
+       logical,dimension(nat,nat),intent(in)  ::  adj     !  Adjacency matrix
+       logical,dimension(nflexi),intent(out)  ::  lch3    !
+       integer,dimension(nat),intent(in)      ::  znum    !
+       integer,intent(in)                     ::  nat     !  
+       integer,intent(in)                     ::  nflexi  !  Number of nodes
+!
+! Local variables
+!
+       logical                                ::  match   !
+       integer                                ::  idx1    !
+       integer                                ::  idx2    !
+       integer                                ::  i,j     !  Index
+!
+! Finding torsions associated to CH3 rotations
+!
+       lch3(:) = .FALSE.
+!
+       do i = 1, dihe%nflexi
+!
+         idx1 = dihe%iflexi(2,i)
+         idx2 = dihe%iflexi(3,i)
+!
+         match = .TRUE.
+!
+         do j = 1, nat
+           if ( j .eq. idx2 ) cycle
+           if ( adj(idx1,j) ) then
+             if ( znum(j) .ne. 1 ) then
+               match = .FALSE.
+               exit
+             end if
+           end if
+         end do
+         if ( match ) GOTO 1000
+!
+         do j = 1, nat
+           if ( j .eq. idx1 ) cycle
+           if ( adj(idx2,j) ) then
+             if ( znum(j) .ne. 1 ) then
+               match = .FALSE.
+               exit
+             end if
+           end if
+         end do
+!
+1000     continue
+!
+         if ( match ) lch3(i) = .TRUE.
+!
+       end do
+!
+       return
+       end subroutine genmethlist
 !
 !======================================================================!
 !
@@ -453,6 +524,8 @@
        dihe%nimpro = 0 
        dihe%ninv   = 0 
 !
+       dihe%ntor = ndihe
+!
        visited(:) = .FALSE.
 !
 ! Setting up improper, inversion, and flexible dihedral
@@ -671,6 +744,211 @@
 !
        return
        end subroutine selectquad
+!
+!======================================================================!
+!
+! GENQUAD - GENerate QUADruplet
+!
+! This subroutine 
+!
+       subroutine genquad(nat,znum,dihed,ndihe)
+!
+       use datatypes,  only:  dihedrals
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(inout)      ::  dihed    !
+       integer,dimension(nat),intent(in)  ::  znum     !
+       integer,intent(in)                 ::  nat      !
+       integer,intent(in)                 ::  ndihe    !
+!
+! Local variables
+!
+       type(dihedrals)                    ::  tmpdi    !            
+       real(kind=8)                       ::  daux
+       logical,dimension(ndihe)           ::  visited  !
+       logical                            ::  flag     !
+       integer,dimension(ndihe)           ::  imap     !  
+       integer,dimension(ndihe)           ::  iflexi   !  
+       integer,dimension(ndihe)           ::  neqquad  !  
+       integer,dimension(4)               ::  vaux     !  
+       integer,dimension(4)               ::  vaux1    !  
+       integer,dimension(4)               ::  vaux2    !  
+       integer                            ::  meqquad  !  
+       integer                            ::  nmap     !
+       integer                            ::  i,j,k    !
+!
+       real(kind=8),parameter             ::  pi =  4*atan(1.0_8) 
+!
+!  Generating principal quadruplets 
+! ---------------------------------
+!
+! Sorting flexible dihedrals by central bond
+!
+       allocate(tmpdi%iflexi(4,ndihe),tmpdi%dflexi(ndihe),             &
+                tmpdi%fflexi(ndihe))
+!
+       visited(:) = .FALSE.
+! 
+       neqquad(:) = 0
+       meqquad = 0
+!
+       k = 0
+       do i = 1, dihed%nflexi
+         if ( visited(i) ) cycle 
+!
+         meqquad = meqquad + 1
+         neqquad(meqquad) = neqquad(meqquad) + 1
+!
+         k = k + 1
+         tmpdi%iflexi(:,k) = dihed%iflexi(:,i)
+         tmpdi%fflexi(k)   = dihed%fflexi(i)
+         tmpdi%dflexi(k)   = dihed%dflexi(i)
+!
+         vaux1(:) = dihed%iflexi(:,i)
+         visited(i) = .TRUE.
+!
+         do j = 1, dihed%nflexi
+           if ( visited(j) ) cycle
+!
+           vaux2(:) = dihed%iflexi(:,j) 
+!
+           if ( ((vaux1(2).eq.vaux2(2)).and.(vaux1(3).eq.vaux2(3))) .or. &
+                ((vaux1(2).eq.vaux2(3)).and.(vaux1(3).eq.vaux2(2))) ) then
+             neqquad(meqquad) = neqquad(meqquad) + 1
+             visited(j) = .TRUE.
+             k = k + 1
+             tmpdi%iflexi(:,k) = dihed%iflexi(:,j)
+             tmpdi%fflexi(k)   = dihed%fflexi(j)
+             tmpdi%dflexi(k)   = dihed%dflexi(j)             
+           end if
+! 
+         end do
+       end do
+!
+       imap(:) = -1
+!
+       k = 0
+       do i = 1, meqquad
+!
+! Removing H-related dihedrals if possible
+!
+         nmap = 0
+!
+         flag = .TRUE.
+         do j = 1, neqquad(i)
+           vaux(:) = tmpdi%iflexi(:,k+j)
+           if ( (znum(vaux(1)).ne.1).and.(znum(vaux(4)).ne.1) ) then 
+             imap(nmap+1) = k + j
+             nmap = nmap + 1
+           end if
+         end do        
+!
+         if ( nmap .eq. 0 ) then
+           flag = .TRUE.
+           do j = 1, neqquad(i)
+             vaux(:) = tmpdi%iflexi(:,k+j)
+             if ( (znum(vaux(1)).ne.1).or.(znum(vaux(4)).ne.1) ) then 
+               imap(nmap+1) = k + j
+               nmap = nmap + 1
+             end if
+           end do  
+         end if
+!
+         if ( nmap .eq. 0 ) then
+           flag = .TRUE.
+           do j = 1, neqquad(i)
+             vaux(:) = tmpdi%iflexi(:,k+j)
+             if ( (znum(vaux(1)).eq.1).and.(znum(vaux(4)).eq.1) ) then 
+               imap(nmap+1) = k + j
+               nmap = nmap + 1
+             end if
+           end do  
+         end if
+!
+! Find leading quadruplet
+!
+         flag = .FALSE.
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.70.0d0) .and. (daux.le.105.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.35.0d0) .and. (daux.le.70.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.105.0d0) .and. (daux.le.150.0d0) ) then
+             flag = .TRUE.
+             iflexi(i) = imap(j)
+             k = k + neqquad(i)
+             exit
+           end if
+         end do
+         if ( flag ) cycle
+!
+         k = k + neqquad(i)
+!
+         neqquad(i) = nmap
+!
+       end do
+!
+! Storing information of selected quadruplets
+!
+       dihed%nquad = meqquad
+       allocate(dihed%iquad(4,meqquad),dihed%dquad(meqquad),           &
+                dihed%fquad(meqquad),dihed%mapquad(meqquad))
+!
+       do i = 1, meqquad
+         dihed%iquad(:,i) = tmpdi%iflexi(:,iflexi(i))
+         dihed%dquad(i)   = tmpdi%dflexi(iflexi(i))
+         dihed%fquad(i)   = tmpdi%fflexi(iflexi(i))
+         dihed%mapquad(i) = iflexi(i)
+       end do
+!
+       return
+       end subroutine genquad
 !
 !======================================================================!
 !
