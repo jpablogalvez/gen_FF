@@ -107,7 +107,7 @@
        logical                                     ::  lcheck  !
        integer,dimension(4)                        ::  ivaux   !
        integer                                     ::  i,j,k   !
-       integer                                     ::  ii,jj   !
+       integer                                     ::  ii      !
 !
        real(kind=8),parameter                      ::  pi =  4*atan(1.0_8) 
 
@@ -209,7 +209,7 @@
 !
 ! Local variables
 !
-       integer                                         ::  i,j      !  Index
+       integer                                         ::  i        !  Index
 !
 ! Building H-deplected adjacency matrix
 !
@@ -716,6 +716,11 @@
 !
        visited(:) = .FALSE.
 !
+       itmp(:,:) = -1
+       dtmp(:)   = 0.0d0
+       ftmp(:)   = -1
+       ntmp      = 0
+!
        k = 0
        do i = 1, dihe%nquad
 !
@@ -779,8 +784,6 @@
        integer                            ::  meqquad  !  
        integer                            ::  nmap     !
        integer                            ::  i,j,k    !
-!
-       real(kind=8),parameter             ::  pi =  4*atan(1.0_8) 
 !
 !  Generating principal quadruplets 
 ! ---------------------------------
@@ -980,180 +983,7 @@
 !
 !======================================================================!
 !
-    function calc_atm_dihed(atom1,atom2,atom3,atom4) result(dh)
-
-        !----------------------------------------------------------------
-        ! Esta función coloca el dihedro en una orientación estandard
-        ! y mide el dihdro. Se obtienen valores con signo de acuerod
-        ! con el criterio establecido.
-        ! NOTE:
-        ! The SR works with individual x(), y(), z() vectors, not atomic
-        ! 3D vectors. Thus the SR is first interfaced to inpunt 3D atomic
-        ! vectors as default in this module.
-        !----------------------------------------------------------------
-
-        real(kind=8),dimension(3),intent(in) :: atom1, atom2, atom3, atom4
-        real(kind=8)::dh
-        real(kind=8),dimension(1:4)::x,y,z
-        real(kind=8)::dx,dy,dz,z_aux,y_aux,theta
-        integer::i
-        real(kind=8),parameter                   ::  pi =  4*atan(1.0_8) 
-
-        !Interface: atom to vectors (in this case x,y,z)
-        x(1:4)=(/atom1(1),atom2(1),atom3(1),atom4(1)/)
-        y(1:4)=(/atom1(2),atom2(2),atom3(2),atom4(2)/)
-        z(1:4)=(/atom1(3),atom2(3),atom3(3),atom4(3)/)
-
-
-        !1) Center the system at Atom3
-        dx=x(3)
-        dy=y(3)
-        dz=z(3)
-        do i=1,4
-            x(i)=x(i)-dx
-            y(i)=y(i)-dy
-            z(i)=z(i)-dz
-        enddo
-
-
-        !2) Lie Atom2--Atom3 on the z-axis.
-        !   a. Rotation around X
-        theta=atan(y(2)/z(2))
-        z_aux=y(2)*sin(theta)+z(2)*cos(theta)
-        if (z_aux>0) theta=theta+pi ! Note: 2 is behind 3
-        do i=1,4
-            z_aux=z(i)
-            z(i)=y(i)*sin(theta)+z_aux*cos(theta)
-            y(i)=y(i)*cos(theta)-z_aux*sin(theta)
-        enddo
-        !   b. Rotation around Y
-        theta=atan(x(2)/z(2))
-        z_aux=x(2)*sin(theta)+z(2)*cos(theta)
-        if (z_aux>0) theta=theta+pi
-        do i=1,4
-            z_aux=z(i)
-            z(i)=x(i)*sin(theta)+z_aux*cos(theta)
-            x(i)=x(i)*cos(theta)-z_aux*sin(theta)
-        enddo
-
-        !3) Put Atom1 on the YZ plane (y>0) 
-        !   a. Rotation around Z
-        theta=atan(x(1)/y(1))
-        y_aux=x(1)*sin(theta)+y(1)*cos(theta)
-        if (y_aux<0) theta=theta+pi ! Note: 1 has positive y
-        do i=1,4
-            y_aux=y(i)
-            y(i)=x(i)*sin(theta)+y_aux*cos(theta)
-            x(i)=x(i)*cos(theta)-y_aux*sin(theta)
-        enddo
-        theta=atan(x(1)/y(1))
-        y_aux=x(1)*sin(theta)+y(1)*cos(theta)
-        if (y_aux<0) theta=theta+pi ! Note: 1 has positive y
-        do i=1,4
-            y_aux=y(i)
-            y(i)=x(i)*sin(theta)+y_aux*cos(theta)
-            x(i)=x(i)*cos(theta)-y_aux*sin(theta)
-        enddo
-
-        dh=atan(x(4)/y(4))
-        ! Comprobamos que de los dos ángulos posibles (en +/- 180)
-        ! obtenemos el que nos interesa comparando con el criterio
-        ! según el cual signo(dh)=signo(x(4))
-        if (dh>0 .and. x(4)<0) dh=dh-pi
-        if (dh<0 .and. x(4)>0) dh=dh+pi
-
-        ! Sale con el signo cambiado!
-        dh=-dh
-        
-        return
-
-     end function calc_atm_dihed
-!
-!======================================================================!
-!
-    function calc_improper(r1,r2,r3,r4) result(im)
-
-        !----------------------------------------------------------------
-        ! Ańgulo formado por el vector 4-1 con el plano 2-3-4
-        !        2
-        !       /
-        !   1--4
-        !       \
-        !       3
-        !----------------------------------------------------------------
-
-        implicit none
-
-        double precision,dimension(1:3),intent(in)::r1,r2,r3,r4
-
-        real(8) :: im
-
-        !Local
-        real(kind=8),parameter          ::  pi =  4*atan(1.0_8) 
-        real(8)            :: X1,Y1,Z1,&
-                              X2,Y2,Z2,&
-                              X3,Y3,Z3,&
-                              X4,Y4,Z4
-        real(8) :: v1,v1x,v1y,v1z,&
-                      v2x,v2y,v2z,&
-                   vn,vnx,vny,vnz
-        integer::i
-
-       !Interface: vectors to atom (in this case x,y,z)
-        X1 = r1(1)
-        X2 = r2(1)
-        X3 = r3(1)
-        X4 = r4(1)
-!
-        Y1 = r1(2)
-        Y2 = r2(2)
-        Y3 = r3(2)
-        Y4 = r4(2)
-!
-        Z1 = r1(3)
-        Z2 = r2(3)
-        Z3 = r3(3)
-        Z4 = r4(3)
-!
-
-       !Vectors 4-2 y 4-3
-        v1x = X2 - X4
-        v1y = Y2 - Y4
-        v1z = Z2 - Z4
-        v2x = X3 - X4
-        v2y = Y3 - Y4
-        v2z = Z3 - Z4
-        !Vector normal al plano
-        vnx = v1y*v2z - v1z*v2y
-        vny = v1z*v2x - v1x*v2z
-        vnz = v1x*v2y - v1y*v2x
-        !Se normaliza
-        vn = dsqrt(vnx**2+vny**2+vnz**2)
-        vnx=vnx/vn
-        vny=vny/vn
-        vnz=vnz/vn
-
-        !Se calcula y normaliza 4-1 (en v1)
-        v1x = X1 - X4
-        v1y = Y1 - Y4
-        v1z = Z1 - Z4
-        v1 = dsqrt(v1x**2+v1y**2+v1z**2)
-        v1x=v1x/v1
-        v1y=v1y/v1
-        v1z=v1z/v1
-
-        !Se calcula el producto escalar de vn y v1
-        im = v1x*vnx + v1y*vny + v1z*vnz
-        im = acos(im)
-
-        !El ángulo es el complementario del anterior
-        im = PI/2.d0 - im
-
-        return
-
-    end function calc_improper
-!
-!======================================================================!
+! Subroutine taken from the Joyce code
 !
       Subroutine Diedro (ci,cj,ck,cl,val)
 !----------------------------------------------------------------------!

@@ -52,8 +52,6 @@
        integer                                 ::  nval    !  Number of different eigenvalue centralities
        integer                                 ::  i,j     !  Indexes
 !
-       real(kind=8),parameter                  ::  thr = 1.0E-6
-!
 !   Chemically equivalent atoms strategy
 !   ....................................
 !
@@ -113,7 +111,7 @@
 !
 !   Isomorphism testing
 !
-               match = VF2_Equivalent(nat,nat,adj,adj,ideg,ideg,order,i,j,check,eqv)
+               match = VF2_Equivalent(nat,nat,adj,adj,ideg,ideg,order,i,j)
 !~ write(*,*) 'checking',i,j,match
 !
                if ( match ) then
@@ -533,10 +531,8 @@
        integer,dimension(nat)                            ::  tag      !
        integer,dimension(nat)                            ::  imol     !
        integer,dimension(nat)                            ::  iagg     !
-       integer,dimension(nat)                            ::  itag     !
        integer,dimension(nat)                            ::  nmol     !
        integer,dimension(nat)                            ::  nagg     !
-       integer,dimension(nat)                            ::  ntag     !
        integer                                           ::  magg     !  Number of aggregates
        integer                                           ::  nsize    !  Maximum aggregate size
 !
@@ -616,7 +612,7 @@
 !
 ! This subroutine 
 !
-       subroutine genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,    &
+       subroutine genffbonded(nat,idat,nidat,coord,adj,lcycle,         &
                               lrigid,znum,bonded,dihed,iroute,debug)
 !
        use datatypes, only: grobonded,                                 &
@@ -630,7 +626,6 @@
        type(dihedrals),intent(inout)                      ::  dihed     !
        real(kind=8),dimension(3,nat),intent(in)           ::  coord     !  Atomic coordinates
        integer,dimension(nat),intent(in)                  ::  idat      ! 
-       integer,dimension(nat),intent(in)                  ::  ideg      ! 
        logical,dimension(nat,nat),intent(in)              ::  adj       !  Boolean adjacency 
        logical,dimension(nat,nat),intent(in)              ::  lcycle    !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)              ::  lrigid    ! 
@@ -648,8 +643,6 @@
        logical,dimension(:,:),allocatable                 ::  adjang    !
        integer,dimension(:,:),allocatable                 ::  edgeang   !
 !
-       integer                                            ::  iterm     !
-!
 ! Generating bonded terms
 ! -----------------------
 !
@@ -664,7 +657,7 @@
        end if
 !
        if ( nat .gt. 3 ) then
-         call gendihe(nat,idat,nidat,coord,znum,ideg,lcycle,lrigid,    &
+         call gendihe(nat,idat,nidat,coord,znum,lcycle,lrigid,         &
                       bonded%nbond,bonded%ibond,bonded%nang,           &
                       bonded%iang,adjang,edgeang,dihed,iroute,debug)
        end if
@@ -824,7 +817,7 @@
 !
 ! This subroutine 
 !
-       subroutine gendihe(nat,idat,nidat,coord,znum,ideg,lcycle,       &
+       subroutine gendihe(nat,idat,nidat,coord,znum,lcycle,            &
                           lrigid,nbond,ibond,nang,iang,adjang,         &
                           edgeang,dihed,iroute,debug)
 !
@@ -841,7 +834,6 @@
        logical,dimension(nat,nat),intent(in)              ::  lrigid   !  Rigid bonds
        integer,dimension(nat),intent(in)                  ::  idat     ! 
        integer,dimension(nat),intent(in)                  ::  znum     ! 
-       integer,dimension(nat),intent(in)                  ::  ideg     ! 
        integer,intent(in)                                 ::  nat      !  Number of atoms
        integer,intent(in)                                 ::  nidat    !
 !
@@ -859,9 +851,6 @@
 !
        integer,dimension(:,:),allocatable                 ::  edges
        integer                                            ::  ndihe    !  Number of dihedrals
-       integer                                            ::  i
-!
-       real(kind=8),parameter                             ::  pi =  4*atan(1.0_8) 
 !
 ! Generating proper dihedral or torsional terms and improper dihedrals
 ! --------------------------------------------------------------------
@@ -919,8 +908,7 @@
 ! Classifying adjacent angles as proper or improper dihedrals
 !
        call setdihe(nat,idat,nidat,coord,nbond,ibond,nang,edgeang,     &
-                    iang,ndihe,dihed,edges,lcycle,lrigid,znum,ideg,    &
-                    iroute)
+                    iang,ndihe,dihed,edges,lcycle,lrigid,znum,iroute)
 !
 ! Removing 3-member cycle dihedrals  ! TODO
 !
@@ -938,8 +926,8 @@
 ! This subroutine 
 !
        subroutine symffbonded(nat,nidat,idat,newlab,bonded,dihed,      &
-                              r,marunit,narunit,arunit,coord,          &
-                              lheavy,adj,fsymm,debug)
+                              r,marunit,narunit,arunit,lheavy,adj,     &
+                              fsymm,debug)
 !
        use datatypes,   only: grobonded,                               &
                               dihedrals
@@ -950,7 +938,6 @@
 !
 ! Input/output variables
 !
-       real(kind=8),dimension(3,nat),intent(in)         ::  coord     !
        type(grobonded),intent(inout)                    ::  bonded    !
        type(dihedrals),intent(inout)                    ::  dihed     !
        logical,dimension(nat,nat),intent(in)            ::  adj       !
@@ -971,15 +958,11 @@
 ! Local variables
 !  
        character(len=20)                                ::  cnum      !
-       real(kind=8)                                     ::  daux      !
        integer,dimension(:),allocatable                 ::  ivaux     !
        integer,dimension(4)                             ::  vaux      !
        integer                                          ::  iaux      !
        integer                                          ::  iterm     !
-       integer                                          ::  itmp      !
        integer                                          ::  i,j       !
-!
-       real(kind=8),parameter                           ::  pi =  4*atan(1.0_8) 
 !
 ! Symmetrizing bonded terms ! TODO: option to reorder dihedral atoms
 ! -------------------------
@@ -1002,7 +985,7 @@
        end do
 !
        call symterm(bonded%nbond,bonded%idbond,bonded%bond,            &
-                    bonded%sbond,bonded%labbond,fsymm,debug)
+                    bonded%sbond,bonded%labbond,fsymm)
 !
 !  Finding equivalent angle-bending terms
 !
@@ -1024,7 +1007,7 @@
        end do
 !
        call symterm(bonded%nang,bonded%idang,bonded%ang,bonded%sang,   &
-                    bonded%labang,fsymm,debug)
+                    bonded%labang,fsymm)
 !
 !  Finding equivalent dihedrals terms
 !
@@ -1167,12 +1150,11 @@
                       dihed%drigid,dihed%srigid,dihed%labrigid,        &
                       dihed%nimpro,dihed%iimpro,dihed%idimpro,         &
                       dihed%dimpro,dihed%simpro,dihed%labimpro,        &
-                      marunit,narunit,arunit,adj,lheavy,fsymm,debug)
+                      marunit,narunit,arunit,adj,lheavy)
        end if
 !
        if ( dihed%ninv .gt. 0 ) then
-         call symoop(dihed%ninv,dihed%idinv,dihed%dinv,dihed%sinv,     &
-                     dihed%labinv,fsymm,debug)
+         call symoop(dihed%ninv,dihed%idinv,dihed%sinv,dihed%labinv)
        end if 
 !
        if ( dihed%nflexi .gt. 0 ) then
@@ -1314,7 +1296,7 @@
 !
        subroutine setdihe(nat,idat,nidat,coord,nbond,ibond,nang,       &
                           edgeang,iang,ndihe,dihed,edgedihe,lcycle,    &
-                          lrigid,znum,ideg,iroute)
+                          lrigid,znum,iroute)
 !
        use datatypes,   only: dihedrals
        use genfftools
@@ -1329,7 +1311,6 @@
        logical,dimension(nat,nat),intent(in)      ::  lrigid    !  Bonds belonging to rings
        integer,dimension(nat),intent(in)          ::  idat      ! 
        integer,dimension(nat),intent(in)          ::  znum      ! 
-       integer,dimension(nat),intent(in)          ::  ideg      ! 
        integer,intent(in)                         ::  nidat     !
        integer,intent(in)                         ::  nat       !
 !
@@ -1356,41 +1337,21 @@
        integer,dimension(ndihe)                   ::  finv      !
        integer                                    ::  ninv      !
        logical,dimension(ndihe)                   ::  torsion   !
-       logical,dimension(ndihe)                   ::  visited   !
        logical,dimension(4)                       ::  lcheck    !
        logical                                    ::  flag      !
        logical                                    ::  lfound    !
        real(kind=8)                               ::  daux      !
-       real(kind=8)                               ::  daux1     !
-       real(kind=8)                               ::  daux2     !
-       integer,dimension(4,ndihe)                 ::  auxdihe   !  
-       integer,dimension(ndihe)                   ::  ivaux     !  
        integer,dimension(4)                       ::  vaux      !  
        integer,dimension(4)                       ::  vaux1     !  
        integer,dimension(4)                       ::  vaux2     ! 
        integer,dimension(2,4)                     ::  bonds     !
        integer,dimension(2)                       ::  rbond     !
-       integer,dimension(2)                       ::  bond1     !
-       integer,dimension(2)                       ::  bond2     !
-       integer,dimension(2)                       ::  bond3     !
-       integer,dimension(2)                       ::  bond4     !
        integer,dimension(3)                       ::  ang1      !
        integer,dimension(3)                       ::  ang2      !
        integer                                    ::  id1       !
        integer                                    ::  id2       !
-       integer                                    ::  id11      !
-       integer                                    ::  id12      !
-       integer                                    ::  id21      !
-       integer                                    ::  id22      !
-       integer                                    ::  ntor      !
-       integer                                    ::  iaux      !
-       integer                                    ::  iaux1     !
-       integer                                    ::  iaux2     !
-       integer                                    ::  iaux3     !
-       integer                                    ::  iaux4     !
        integer                                    ::  itmp      !
        integer                                    ::  i,j,k     !  Indexes
-       integer                                    ::  ii,jj,kk  !  Indexes
 !
        real(kind=8),parameter                    ::  pi =  4*atan(1.0_8) 
 !
@@ -1899,108 +1860,11 @@
 !
 !======================================================================!
 !
-! LABDIHE - LABeling DIHEdrals
-!
-! This subroutine 
-!
-       subroutine labdihe(nat,idat,nidat,ndihe,idihe,iddihe,niddihe,   &
-                          nimpro,nrigid,nflexi,debug)
-!
-       use graphtools, only:  inormlabels
-!
-       implicit none
-!
-! Input/output variables
-!
-       integer,dimension(4,ndihe),intent(in)  ::  idihe    !
-       integer,dimension(nat),intent(in)      ::  idat     ! 
-       integer,dimension(ndihe),intent(out)   ::  iddihe   !
-       integer,intent(in)                     ::  nat      !  
-       integer,intent(in)                     ::  ndihe    !  
-       integer,intent(in)                     ::  nidat    !  
-       integer,intent(out)                    ::  niddihe  !  
-       logical,intent(in)                     ::  debug    !
-       integer,intent(in)                     ::  nimpro   !
-       integer,intent(in)                     ::  nrigid   !
-       integer,intent(in)                     ::  nflexi   !
-!
-! Local variables
-!
-       integer,dimension(ndihe)               ::  ivaux    !
-       integer                                ::  i,j      !
-!
-!  Combining labels of adjacent nodes
-! -----------------------------------
-!
-!~        do i = 1, nimpro
-!~          ivaux(i) = min(idat(idihe(1,i)),idat(idihe(2,i)))*nidat**3    &
-!~                   + max(idat(idihe(1,i)),idat(idihe(2,i)))*nidat**2    &
-!~                   + min(idat(idihe(3,i)),idat(idihe(4,i)))*nidat       &
-!~                   + max(idat(idihe(3,i)),idat(idihe(4,i)))
-!~        end do
-!~ !
-!~        do i = nimpro+1, ndihe
-!~          ivaux(i) = min(idat(idihe(2,i)),idat(idihe(3,i)))*nidat**3    &
-!~                   + max(idat(idihe(2,i)),idat(idihe(3,i)))*nidat**2    &
-!~                   + min(idat(idihe(1,i)),idat(idihe(4,i)))*nidat       &
-!~                   + max(idat(idihe(1,i)),idat(idihe(4,i)))
-!~        end do
-!
-!~        if ( debug ) then
-!~          write(*,*) 'Non-normalized combined labels'
-!~          write(*,*) '------------------------------'
-!~          do i = 1, ndihe
-!~            write(*,'(200(1X,I3))') i,(idat(idihe(j,i)),j=1,4),ivaux(i)
-!~          end do
-!~          write(*,*)
-!~        end if
-!
-       call inormlabels(ndihe,ivaux,iddihe,niddihe)
-!
-!~        if ( debug ) then
-!~          write(*,*) 'Normalized combined labels'
-!~          write(*,*) '--------------------------'
-!~          do i = 1, ndihe
-!~            write(*,'(200(1X,I3))') i,ivaux(i),iddihe(i)
-!~          end do
-!~          write(*,*)
-!~        end if
-!
-! Including dihedral type information in labels
-!
-       do i = 1, nimpro
-         ivaux(i) = 3*iddihe(i) + 1
-       end do
-
-       do i = nimpro+1, nimpro+nrigid
-         ivaux(i) = 3*iddihe(i) + 2
-       end do
-!
-       do i = nimpro+nrigid+1, ndihe
-         ivaux(i) = 3*iddihe(i) + 3
-       end do
-!
-       call inormlabels(ndihe,ivaux,iddihe,niddihe)
-!
-       if ( debug ) then
-         write(*,*) 'Normalized dihedral labels'
-         write(*,*) '--------------------------'
-         do i = 1, ndihe
-           write(*,'(200(1X,I3))') i,ivaux(i),iddihe(i)
-         end do
-         write(*,*)
-       end if
-!
-       return
-       end subroutine labdihe
-!
-!======================================================================!
-!
 ! SYMTERM - SYMmetrizing force field TERMs
 !
 ! This subroutine 
 !
-       subroutine symterm(nbond,idbond,dbond,sbond,labbond,fsymm,debug)
+       subroutine symterm(nbond,idbond,dbond,sbond,labbond,fsymm)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2014,7 +1878,6 @@
        integer,dimension(nbond),intent(out)           ::  idbond  !
        integer,dimension(nbond),intent(in)            ::  sbond   !
        integer,intent(in)                             ::  nbond   !  
-       logical,intent(in)                             ::  debug   !
        logical,intent(in)                             ::  fsymm   !
 !
 ! Equivalent atoms information
@@ -2024,10 +1887,8 @@
        integer,dimension(nbond)                       ::  tag      !
        integer,dimension(nbond)                       ::  imol     !
        integer,dimension(nbond)                       ::  iagg     !
-       integer,dimension(nbond)                       ::  itag     !
        integer,dimension(nbond)                       ::  nmol     !
        integer,dimension(nbond)                       ::  nagg     !
-       integer,dimension(nbond)                       ::  ntag     !
        integer                                        ::  magg     !  Number of aggregates
        integer                                        ::  nsize    !  Maximum aggregate size
 !
@@ -2112,7 +1973,7 @@
 !
 ! This subroutine 
 !
-       subroutine symoop(ndihe,iddihe,ddihe,sdihe,labdihe,fsymm,debug)
+       subroutine symoop(ndihe,iddihe,sdihe,labdihe)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2122,12 +1983,9 @@
 ! Input/output variables
 !
        character(len=50),dimension(ndihe),intent(in)  ::  labdihe !
-       real(kind=8),dimension(ndihe),intent(inout)    ::  ddihe   !
        integer,dimension(ndihe),intent(out)           ::  iddihe  !
        integer,dimension(ndihe),intent(in)            ::  sdihe   !
        integer,intent(in)                             ::  ndihe   !  
-       logical,intent(in)                             ::  fsymm   ! 
-       logical,intent(in)                             ::  debug   !
 !
 ! Equivalent atoms information
 !
@@ -2136,21 +1994,16 @@
        integer,dimension(ndihe)                       ::  tag      !
        integer,dimension(ndihe)                       ::  imol     !
        integer,dimension(ndihe)                       ::  iagg     !
-       integer,dimension(ndihe)                       ::  itag     !
        integer,dimension(ndihe)                       ::  nmol     !
        integer,dimension(ndihe)                       ::  nagg     !
-       integer,dimension(ndihe)                       ::  ntag     !
        integer                                        ::  magg     !  Number of aggregates
        integer                                        ::  nsize    !  Maximum aggregate size
 !
 ! Local variables
 !
        logical,dimension(ndihe,ndihe)                 ::  adj      !
-       real(kind=8)                                   ::  daux     !
        integer                                        ::  i,j      !
        integer                                        ::  k,l      !
-!
-       real(kind=8)                                   ::  thr = 5.0d0
 !
 !  Symmetrizing bond distances
 ! ----------------------------
@@ -2179,7 +2032,8 @@
          if ( nagg(i) .ne. 0 ) then
            do j = 1, nagg(i)
 !
-!             daux = 0     ! TODO: symmetrize absolute value but keep sign
+!             if ( fsymm ) then ! TODO: symmetrize absolute value but keep sign
+!             daux = 0     
 !             do l = k+1, k+i
 !                daux = daux + ddihe(mol(l))
 !             end do
@@ -2188,6 +2042,7 @@
 !             do l = k+1, k+i
 !               ddihe(mol(l)) = daux
 !             end do
+!             end if
 !
              do l = k+2, k+i
                write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
@@ -2239,8 +2094,6 @@
        integer                                        ::  niddihe  !
        integer                                        ::  nterm    !
        integer                                        ::  i,j,k    !
-!
-       real(kind=8)                                   ::  thr = 5.0d0
 !
 !  Symmetrizing flexible dihedrals
 ! --------------------------------
@@ -2322,7 +2175,7 @@
        subroutine setdeps(nat,r,idat,ndihe,nrigid,irigid,idrigid,      &
                            drigid,srigid,labrigid,nimpro,iimpro,       & 
                            idimpro,dimpro,simpro,labimpro,marunit,     &
-                           narunit,arunit,adj,lheavy,fsymm,debug)
+                           narunit,arunit,adj,lheavy)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2352,8 +2205,6 @@
        integer,intent(in)                              ::  marunit   !    
        logical,dimension(nat,nat),intent(in)           ::  adj       !
        logical,dimension(nat),intent(in)               ::  lheavy    !
-       logical,intent(in)                              ::  fsymm     !   
-       logical,intent(in)                              ::  debug     !
 !
 ! Equivalent atoms information
 !
@@ -2368,10 +2219,8 @@
        integer,dimension(ndihe)                        ::  tag       !
        integer,dimension(ndihe)                        ::  imol      !
        integer,dimension(ndihe)                        ::  iagg      !
-       integer,dimension(ndihe)                        ::  itag      !
        integer,dimension(ndihe)                        ::  nmol      !
        integer,dimension(ndihe)                        ::  nagg      !
-       integer,dimension(ndihe)                        ::  ntag      !
        integer                                         ::  magg      !  Number of aggregates
        integer                                         ::  nsize     !  Maximum aggregate size
        integer                                         ::  niddihe   !  
@@ -2383,7 +2232,6 @@
        logical,dimension(nat)                             ::  visited   !
        logical,dimension(nat)                             ::  lunit     !
        logical,dimension(nimpro)                          ::  chkimpro  !
-       real(kind=8)                                       ::  daux      !
        integer,dimension(2,nat*nat)                       ::  ibond     !
        integer,dimension(4,ndihe)                         ::  iquad     !
        integer,dimension(ndihe)                           ::  idxdihe   !

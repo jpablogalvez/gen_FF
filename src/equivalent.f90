@@ -4,8 +4,8 @@
 !
        use timings
        use lengths,       only:  leninp,lenout,lentag,lenlab,lenarg
-       use units,         only:  uniinp,uniic,unideps,unitmp,uniscr,   &
-                                 unitop,uninb,unicorr
+       use units,         only:  uniinp,unideps,unitmp,uniscr,unitop
+                                 
 !
        use datatypes
 !
@@ -50,7 +50,6 @@
        character(len=lentag)                           ::  formt    !  QC  output format
        logical                                         ::  fqmout   !
        logical                                         ::  fqmscan  !
-       logical                                         ::  fqmdihe  !
 !
        character(len=20)                               ::  meth     !
        character(len=20)                               ::  basis    !
@@ -107,7 +106,6 @@
        integer,dimension(:),allocatable                ::  itype    !  Integer associated to atomtypes
        integer                                         ::  nlab     !  Number of initial labels
        integer                                         ::  nidat    !  Number of refined labels
-       integer                                         ::  ntype    !  Number of atom types
 !
 ! Auxiliary variables
 !
@@ -650,8 +648,8 @@
 !
        if ( fqmout ) then
 !
-         call genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,        &
-                          lrigid,znum,top%bonded,dihe,iroute,debug)
+         call genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,      &
+                          znum,top%bonded,dihe,iroute,debug)
 !
        else
 !
@@ -707,9 +705,9 @@
 !
        write(unideps,'(A)') '$dependence 1.2'
 !
-       call symffbonded(nat,nidat,idat,newlab,top%bonded,dihe,         &
-                        rank,marunit,narunit,arunit,coord,             &
-                        lheavy,adj,fsymm,debug)
+       call symffbonded(nat,nidat,idat,newlab,top%bonded,dihe,rank,    &
+                        marunit,narunit,arunit,lheavy,adj,fsymm,debug)
+                        
 !
        write(unideps,'(A)') '$end'
 !
@@ -739,8 +737,8 @@
 ! Printing force field
 ! --------------------
 !
-       call print_top(unitop,nat,itype,mindis,top,dihe,bas,geo,intop,  &
-                      topout,fpairs,fexcl,debug)
+       call print_top(unitop,nat,itype,mindis,top,dihe,geo,intop,      &
+                      topout,fpairs,fexcl)
 !
 ! Printing JOYCE input files
 ! --------------------------

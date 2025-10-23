@@ -636,8 +636,8 @@
 !
 ! This subroutine 
 !
-       subroutine print_top(uni,nat,itype,mindis,top,dihe,bas,geo,     &
-                            intop,topout,fpairs,fexcl,debug)
+       subroutine print_top(uni,nat,itype,mindis,top,dihe,geo,         &
+                            intop,topout,fpairs,fexcl)
 !
        use datatypes,   only:  grotop,                                 &
                                dihedrals
@@ -648,7 +648,6 @@
 !
        type(grotop),intent(in)                ::  top      !
        type(dihedrals),intent(in)             ::  dihe     !
-       character(len=leninp),intent(in)       ::  bas      !
        character(len=leninp),intent(in)       ::  intop    !
        character(len=leninp),intent(in)       ::  topout   !
        character(len=leninp),intent(in)       ::  geo      !
@@ -658,8 +657,6 @@
        integer,intent(in)                     ::  uni      !
        logical,intent(in)                     ::  fpairs   !  
        logical,intent(in)                     ::  fexcl    !  
-!
-       logical,intent(in)                     ::  debug    !  Debug mode
 !
 ! Printing Gromacs topology
 ! -------------------------
@@ -675,9 +672,9 @@
 !
 ! Printing bonded terms
 !
-       call print_bond(uni,topout,top%bonded)
-       if ( top%bonded%nang .ge. 1 ) call print_angle(uni,topout,top%bonded)
-       if ( dihe%ndihe .ge. 1 ) call print_dihe(uni,topout,dihe)
+       call print_bond(uni,top%bonded)
+       if ( top%bonded%nang .ge. 1 ) call print_angle(uni,top%bonded)
+       if ( dihe%ndihe .ge. 1 ) call print_dihe(uni,dihe)
 !
 ! Printing pairs section
 !
@@ -699,7 +696,7 @@
 !
 !======================================================================!
 !
-       subroutine print_bond(uni,top,bonded)
+       subroutine print_bond(uni,bonded)
 !
        use datatypes, only: grobonded
 !
@@ -709,7 +706,6 @@
 !
        type(grobonded)                   ::  bonded  !  
        integer,intent(in)                ::  uni     !
-       character(len=leninp),intent(in)  ::  top     !
 !
 ! Local variables
 !
@@ -737,7 +733,7 @@
 !
 !======================================================================!
 !
-       subroutine print_angle(uni,top,bonded)
+       subroutine print_angle(uni,bonded)
 !
        use datatypes, only: grobonded
 !
@@ -747,7 +743,6 @@
 !
        type(grobonded)                   ::  bonded  !  
        integer,intent(in)                ::  uni     !
-       character(len=leninp),intent(in)  ::  top     !
 !
 ! Local variables
 !
@@ -771,7 +766,7 @@
 !
 !======================================================================!
 !
-       subroutine print_dihe(uni,top,dihe)
+       subroutine print_dihe(uni,dihe)
 !
        use datatypes, only: dihedrals
 !
@@ -781,7 +776,6 @@
 !
        type(dihedrals)                   ::  dihe  !  
        integer,intent(in)                ::  uni   !
-       character(len=leninp),intent(in)  ::  top   !
 !
 ! Local variables
 !
@@ -860,7 +854,6 @@
 !
 ! Local variables
 !
-       character(len=leninp)             ::  topname  !
        integer                           ::  i        !
 !
 ! Printing Gromacs topology header

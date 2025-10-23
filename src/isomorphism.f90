@@ -60,7 +60,7 @@
 !
        logical function VF2_Equivalent(N1,N2,AdjMatrix1,AdjMatrix2,    &
                                        NodeDegrees1,NodeDegrees2,      &
-                                       order,v,w,check,eqv)
+                                       order,v,w)
 !
        implicit none
 !
@@ -71,12 +71,9 @@
        integer,intent(in) ::  NodeDegrees2(N2)
        logical,intent(in) :: AdjMatrix1(N1,N1)
        logical,intent(in) :: AdjMatrix2(N2,N2)
-       logical,intent(inout) :: check(N2)
-       logical,intent(inout) :: eqv(N2,N2)
 !
 ! Variables locales
 !
-       integer :: i
        integer :: t1(N1) ! Añadido para almacenar el estado de mapeo
        integer :: t2(N2) ! Añadido para almacenar el estado de mapeo
        logical :: In1(N1)
