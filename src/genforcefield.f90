@@ -1697,7 +1697,7 @@
            allocate(dihed%flexi(i)%tor(dihed%flexi(i)%ntor))
 !
            dihed%flexi(i)%itor(:) = dihed%iflexi(:,i)
-           dihed%fflexi(i)        = 9 
+           dihed%fflexi(i)        = 1
 !
            dihed%flexi(i)%tor(1)%vtor  = 0.0d0
            dihed%flexi(i)%tor(1)%phase = dihed%dflexi(i)
@@ -1709,7 +1709,7 @@
            allocate(dihed%flexi(i)%tor(dihed%flexi(i)%ntor)) 
 !
            dihed%flexi(i)%itor(:) = dihed%iflexi(:,i)
-           dihed%fflexi(i)        = 9
+           dihed%fflexi(i)        = 1
 !
            do j = 1, dihed%flexi(i)%ntor
              dihed%flexi(i)%tor(j)%vtor  = 0.0d0
