@@ -547,7 +547,7 @@
        bonded%idihe(:,:) = 0
        bonded%dihe(:)    = 0.0d0
        bonded%kdihe(:)   = 0.0d0
-       bonded%multi(:)   = 0.0d0
+       bonded%multi(:)   = 0
 !
        bonded%c0(:) = 0.0d0
        bonded%c1(:) = 0.0d0

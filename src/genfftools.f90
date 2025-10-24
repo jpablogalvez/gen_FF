@@ -17,6 +17,7 @@
                    findarcycles,                                       &
                    bonded2dihe,                                        &
                    selectquad,                                         &
+                   screenquad,                                         &
                    calc_angle,                                         &
                    diedro
 !
@@ -228,7 +229,7 @@
 !
 ! This subroutine 
 !
-       subroutine genmethlist(nat,adj,znum,dihe,nflexi,lch3)
+       subroutine genmethlist(nat,adj,znum,dihe,nflexi,lch3,ich3,debug)
 !
        use datatypes,  only:  dihedrals
 !
@@ -236,23 +237,28 @@
 !
 ! Input/output variables
 !
-       type(dihedrals),intent(in)             ::  dihe    !
-       logical,dimension(nat,nat),intent(in)  ::  adj     !  Adjacency matrix
-       logical,dimension(nflexi),intent(out)  ::  lch3    !
-       integer,dimension(nat),intent(in)      ::  znum    !
-       integer,intent(in)                     ::  nat     !  
-       integer,intent(in)                     ::  nflexi  !  Number of nodes
+       type(dihedrals),intent(in)               ::  dihe    !
+       logical,dimension(nat,nat),intent(in)    ::  adj     !  Adjacency matrix
+       logical,dimension(nflexi),intent(out)    ::  lch3    !
+       integer,dimension(3,nflexi),intent(out)  ::  ich3    !
+       integer,dimension(nat),intent(in)        ::  znum    !
+       integer,intent(in)                       ::  nat     !  
+       integer,intent(in)                       ::  nflexi  !  Number of nodes
+       logical,intent(in)                       ::  debug   !
 !
 ! Local variables
 !
-       logical                                ::  match   !
-       integer                                ::  idx1    !
-       integer                                ::  idx2    !
-       integer                                ::  i,j     !  Index
+       logical                                  ::  match   !
+       integer                                  ::  idx1    !
+       integer                                  ::  idx2    !
+       integer                                  ::  idx3    !
+       integer                                  ::  i,j     !  Index
 !
 ! Finding torsions associated to CH3 rotations
 !
        lch3(:) = .FALSE.
+!
+       idx3 = -1
 !
        do i = 1, dihe%nflexi
 !
@@ -261,32 +267,57 @@
 !
          match = .TRUE.
 !
-         do j = 1, nat
-           if ( j .eq. idx2 ) cycle
-           if ( adj(idx1,j) ) then
-             if ( znum(j) .ne. 1 ) then
-               match = .FALSE.
-               exit
+         if ( znum(idx1) .eq. 6 ) then
+           do j = 1, nat
+             if ( j .eq. idx2 ) cycle
+             if ( adj(idx1,j) ) then
+               if ( znum(j) .ne. 1 ) then
+                 match = .FALSE.
+                 exit
+               end if                 
              end if
+           end do
+           idx3 = dihe%iflexi(4,i)
+           if ( match ) then
+             lch3(i) = .TRUE.
+             ich3(1,i) = idx1
+             ich3(2,i) = idx2
+             ich3(3,i) = idx3  
+             cycle
            end if
-         end do
-         if ( match ) GOTO 1000
+         end if
 !
-         do j = 1, nat
-           if ( j .eq. idx1 ) cycle
-           if ( adj(idx2,j) ) then
-             if ( znum(j) .ne. 1 ) then
-               match = .FALSE.
-               exit
+         if ( znum(idx2) .eq. 6 ) then
+           do j = 1, nat
+             if ( j .eq. idx1 ) cycle
+             if ( adj(idx2,j) ) then
+               if ( znum(j) .ne. 1 ) then
+                 match = .FALSE.
+                 exit
+               end if                 
              end if
+           end do
+           idx3 = dihe%iflexi(1,i) 
+           if ( match ) then
+             lch3(i) = .TRUE.
+             ich3(1,i) = idx2
+             ich3(2,i) = idx1
+             ich3(3,i) = idx3  
            end if
-         end do
-!
-1000     continue
-!
-         if ( match ) lch3(i) = .TRUE.
-!
+         end if
+! 
        end do
+!
+       if ( debug ) then
+         write(*,'(1X,A)') 'List of CH3 rotations'
+         write(*,'(1X,A)') '---------------------'
+         do i = 1, dihe%nflexi
+           if ( lch3(i) ) write(*,'(1X,I4,1X,A,4I4,A,4I4)')            &
+                                  i,'CH3 rotation',dihe%iflexi(:,i),   &
+                                             ' with backbone ',ich3(:,i)
+         end do
+         write(*,*)
+       end if
 !
        return
        end subroutine genmethlist
@@ -678,7 +709,7 @@
 !
 ! This subroutine 
 !
-       subroutine selectquad(nat,ndihe,dihe,idat,nidat)
+       subroutine selectquad(nat,ndihe,dihe,idat,nidat,debug)
 !
        use datatypes,  only:  dihedrals
 !
@@ -693,6 +724,7 @@
        integer,intent(in)                 ::  nat     !
        integer,intent(in)                 ::  nidat   !
        integer,intent(in)                 ::  ndihe   !
+       logical,intent(in)                 ::  debug   !
 !
 ! Local variables
 !
@@ -747,8 +779,149 @@
        dihe%fquad(:)   = ftmp(:)
        dihe%nquad = ntmp  
 !
+       if ( debug ) then
+         write(*,'(1X,A)') 'Unique quadruplets'
+         write(*,'(1X,A)') '------------------'
+         do i = 1, dihe%nquad
+           write(*,'(1X,A,4I4)') 'Quadruplet',dihe%iquad(:,i)
+         end do
+         write(*,*)
+       end if
+!
        return
        end subroutine selectquad
+!
+!======================================================================!
+!
+! SCREENQUAD - SCREEN QUADruplet
+!
+! This subroutine 
+!
+       subroutine screenquad(dihe,nflexi,lch3,ich3,ndihe,nat,idat)
+!
+       use datatypes,  only:  dihedrals
+!
+       use printings,  only:  print_end
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(inout)           ::  dihe    !
+       logical,dimension(nflexi),intent(in)    ::  lch3    !
+       integer,dimension(3,nflexi),intent(in)  ::  ich3    !
+       integer,dimension(nat),intent(in)       ::  idat    !
+       integer,intent(in)                      ::  nflexi  !
+       integer,intent(in)                      ::  nat     !
+       integer,intent(in)                      ::  ndihe   !
+!
+! Local variables
+!
+       type(dihedrals)                         ::  tmpdihe  !
+       integer,dimension(4)                    ::  ivaux1   !
+       integer,dimension(4)                    ::  ivaux2   !
+       integer                                 ::  i,j,k    !
+! 
+!  Including only principal quadruplets 
+! -------------------------------------
+!
+! Generating new representation with a reduced set of quadruplets
+!
+       allocate(tmpdihe%iflexi(4,ndihe),tmpdihe%dflexi(ndihe),         &
+                tmpdihe%kflexi(ndihe),tmpdihe%fflexi(ndihe),           &
+                tmpdihe%flexi(ndihe))
+!
+       tmpdihe%iflexi(:,:) = -1
+       tmpdihe%dflexi(:)   = 999.0d0
+       tmpdihe%kflexi(:)   = 0.0d0
+       tmpdihe%fflexi(:)   = -1
+!
+       k = 0
+       do i = 1, dihe%nflexi
+         ivaux1(:) = dihe%iflexi(:,i)
+         if ( lch3(i) ) then
+!
+write(*,*) 'Dihedral',i,'is a CH3 rotation',dihe%iflexi(:,i)
+           do j = 1, dihe%nquad
+             ivaux2(:) = dihe%iquad(:,j)
+             if ( ((idat(ich3(1,i)).eq.idat(ivaux2(2))).and.             &
+                   (idat(ich3(2,i)).eq.idat(ivaux2(3))).and.             &
+                   (idat(ich3(3,i)).eq.idat(ivaux2(4)))                  &
+             .or. ((idat(ich3(1,i)).eq.idat(ivaux2(3))).and.             &
+                   (idat(ich3(2,i)).eq.idat(ivaux2(2))).and.             &
+                   (idat(ich3(3,i)).eq.idat(ivaux2(1))))) ) then
+write(*,*) '  Overlap with princial quadruplet',j,':',dihe%iquad(:,j) 
+write(*,*)
+!
+               k = k + 1
+!
+               tmpdihe%iflexi(:,k) = dihe%iflexi(:,i)
+               tmpdihe%dflexi(k)   = dihe%dflexi(i)
+               tmpdihe%kflexi(k)   = dihe%kflexi(i)
+               tmpdihe%fflexi(k)   = dihe%fflexi(i)
+!
+               tmpdihe%flexi(k)%ntor = dihe%flexi(i)%ntor
+               allocate(tmpdihe%flexi(k)%tor(tmpdihe%flexi(k)%ntor))
+!
+               tmpdihe%flexi(k)%itor(:) = dihe%flexi(i)%itor(:)
+               tmpdihe%flexi(k)%tor     = dihe%flexi(i)%tor
+! 
+               exit
+!
+             end if
+           end do
+!
+         else
+!
+           do j = 1, dihe%nquad
+             ivaux2(:) = dihe%iquad(:,j)
+             if ( ((ivaux1(1).eq.ivaux2(1)).and.                       &
+                   (ivaux1(2).eq.ivaux2(2)).and.                       &
+                   (ivaux1(3).eq.ivaux2(3)).and.                       &
+                   (ivaux1(4).eq.ivaux2(4))) ) then
+!
+               k = k + 1
+!
+               tmpdihe%iflexi(:,k) = dihe%iflexi(:,i)
+               tmpdihe%dflexi(k)   = dihe%dflexi(i)
+               tmpdihe%kflexi(k)   = dihe%kflexi(i)
+               tmpdihe%fflexi(k)   = dihe%fflexi(i)
+!
+               tmpdihe%flexi(k)%ntor = dihe%flexi(i)%ntor
+               allocate(tmpdihe%flexi(k)%tor(tmpdihe%flexi(k)%ntor))
+!
+               tmpdihe%flexi(k)%itor(:) = dihe%flexi(i)%itor(:)
+               tmpdihe%flexi(k)%tor     = dihe%flexi(i)%tor
+!
+             end if
+           end do
+!         
+         end if
+       end do
+!
+       tmpdihe%nflexi = k
+!
+! Storing new representation in the original one
+!
+       do i = 1, dihe%nflexi
+         deallocate(dihe%flexi(i)%tor)
+       end do
+!
+       tmpdihe%ntor = 0
+       do i = 1, tmpdihe%nflexi
+         allocate(dihe%flexi(i)%tor(tmpdihe%flexi(i)%ntor))
+         dihe%flexi(i) = tmpdihe%flexi(i)
+       end do
+!
+       dihe%nflexi = tmpdihe%nflexi
+! 
+       dihe%iflexi(:,:) = tmpdihe%iflexi(:,:)
+       dihe%dflexi(:)   = tmpdihe%dflexi(:)
+       dihe%kflexi(:)   = tmpdihe%kflexi(:)
+       dihe%fflexi(:)   = tmpdihe%fflexi(:)
+!
+       return
+       end subroutine screenquad
 !
 !======================================================================!
 !
@@ -756,7 +929,7 @@
 !
 ! This subroutine 
 !
-       subroutine genquad(nat,znum,dihed,ndihe)
+       subroutine genquad(nat,znum,dihed,ndihe,debug)
 !
        use datatypes,  only:  dihedrals
 !
@@ -768,6 +941,7 @@
        integer,dimension(nat),intent(in)  ::  znum     !
        integer,intent(in)                 ::  nat      !
        integer,intent(in)                 ::  ndihe    !
+       logical,intent(in)                 ::  debug    !
 !
 ! Local variables
 !
@@ -949,6 +1123,15 @@
          dihed%fquad(i)   = tmpdi%fflexi(iflexi(i))
          dihed%mapquad(i) = iflexi(i)
        end do
+!
+       if ( debug ) then
+         write(*,'(1X,A)') 'Principal quadruplets'
+         write(*,'(1X,A)') '---------------------'
+         do i = 1, dihed%nquad
+           write(*,'(1X,A,4I4)') 'Quadruplet',dihed%iquad(:,i)
+         end do
+         write(*,*)
+       end if
 !
        return
        end subroutine genquad

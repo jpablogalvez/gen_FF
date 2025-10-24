@@ -34,6 +34,7 @@
        integer                                         ::  nmol     !  
        integer                                         ::  knei     !  Maximum distance from source node
        integer                                         ::  iroute   !  
+       logical                                         ::  fquad    !
        logical                                         ::  fsymm    !
        logical                                         ::  fpairs   !
        logical                                         ::  fexcl    !
@@ -77,6 +78,7 @@
        integer,dimension(:),allocatable                ::  naroma   !  Number of atoms in each aromatic cycle
        integer,dimension(:),allocatable                ::  narunit  !  Number of atoms in each aromatic unit
        integer,dimension(:),allocatable                ::  ideg     !  
+       integer,dimension(:,:),allocatable              ::  ich3     !  Methyl backbone       
        integer                                         ::  mcycle   !  Number of cycles
        integer                                         ::  maroma   !  Number of aromatic cycles
        integer                                         ::  marunit  !  Number of aromatic units
@@ -144,7 +146,7 @@
        call command_line(inp,ref,intop,topout,qmout,qmdir,knei,        &
                          iroute,formt,meth,basis,disp,chrg,mult,step,  &
                          nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
-                         fpairs,fexcl,debug)
+                         fpairs,fexcl,fquad,debug)
 !
 ! Defaults
 !
@@ -649,7 +651,7 @@
        if ( fqmout ) then
 !
          call genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,      &
-                          lch3,znum,top%bonded,dihe,iroute,debug)
+                          lch3,ich3,znum,top%bonded,dihe,iroute,debug)
 !
        else
 !
@@ -680,21 +682,42 @@
 !
          call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
-         call genquad(nat,znum,dihe,dihe%ndihe)
+! Finding principal quadruplets
+!
+         call genquad(nat,znum,dihe,dihe%ndihe,debug)
 !
 ! Finding quadruplets associated to CH3 rotations
 !
-         allocate(lch3(dihe%ndihe))
-         call genmethlist(nat,adj,znum,dihe,dihe%ndihe,lch3)
+         allocate(lch3(dihe%nflexi),dihe%ich3(dihe%nflexi))
+         call genmethlist(nat,adj,znum,dihe,dihe%ndihe,lch3,ich3,debug)
 !
 ! TODO: check if equilibrium distances should be taken from external geometry
 !
        end if
 !
-       reftop%nstiff  = top%bonded%nbond +                             &
-                        top%bonded%nang +                              &
-                        dihe%nimpro + dihe%ninv + dihe%nrigid
-       reftop%nsoft   = dihe%nflexi
+! Finding unique cuadruplets
+! --------------------------
+!
+       if ( fquad ) call screenquad(dihe,dihe%nflexi,lch3,ich3,        &
+                                    dihe%ndihe,nat,idat)
+!
+       if ( dihe%nquad .gt. 1 ) call selectquad(nat,dihe%nquad,dihe,   &
+                                                 idat,nidat,debug) 
+       do i = 1, dihe%nquad
+!
+         write(cnum,'(I2.2)') i
+         cnum  = adjustl(cnum)
+         cname = trim(bas)//'_scan-'//trim(cnum)
+!
+         INQUIRE(FILE=trim(qmdir)//trim(cname)//'.log',EXIST=fqmscan)
+!
+         if ( .NOT. fqmscan ) then
+           call genscan(i,nat,lab,coord,dihe%nquad,dihe%iquad,nstep,   &
+                        step,cname,qmdir,formt,meth,basis,disp,        &
+                        chrg,mult)
+         end if
+!
+       end do
 !
 ! Symmetrizing force field terms
 ! ------------------------------
@@ -713,26 +736,10 @@
 !
        close(unideps)
 !
-! Selecting unique cuadruplets
-! ----------------------------
-!
-       if ( dihe%nquad .gt. 1 ) call selectquad(nat,dihe%nquad,dihe,   &
-                                                 idat,nidat) 
-       do i = 1, dihe%nquad
-!
-         write(cnum,'(I2.2)') i
-         cnum  = adjustl(cnum)
-         cname = trim(bas)//'_scan-'//trim(cnum)
-!
-         INQUIRE(FILE=trim(qmdir)//trim(cname)//'.log',EXIST=fqmscan)
-!
-         if ( .NOT. fqmscan ) then
-           call genscan(i,nat,lab,coord,dihe%nquad,dihe%iquad,nstep,   &
-                        step,cname,qmdir,formt,meth,basis,disp,        &
-                        chrg,mult)
-         end if
-!
-       end do
+       reftop%nstiff  = top%bonded%nbond +                             &
+                        top%bonded%nang +                              &
+                        dihe%nimpro + dihe%ninv + dihe%nrigid
+       reftop%nsoft   = dihe%ntor
 !
 ! Printing force field
 ! --------------------
@@ -930,7 +937,7 @@
        subroutine command_line(inp,ref,top,topout,qmout,qmdir,knei,    &
                                iroute,formt,meth,basis,disp,chrg,mult, & 
                                step,nstep,sysname,resname,nmol,fsig,   &
-                               feps,fsymm,fpairs,fexcl,debug)
+                               feps,fsymm,fpairs,fexcl,fquad,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -956,6 +963,7 @@
        integer,intent(out)                ::  nmol     !  
        integer,intent(out)                ::  knei     !  
        integer,intent(out)                ::  iroute   !  
+       logical,intent(out)                ::  fquad    !  
        logical,intent(out)                ::  fsymm    !  
        logical,intent(out)                ::  fpairs   !  
        logical,intent(out)                ::  fexcl    !  
@@ -990,6 +998,7 @@
 !
        knei   = -1
        iroute = 1
+       fquad  = .TRUE.
 !
        formt  = 'g16'
        step  = 15.0
@@ -1140,6 +1149,16 @@
              read(next,*) mult
              i = i + 1
 !
+           case ('-step','--scan-step')
+             call get_command_argument(i,next,status=io)
+             read(next,*) step
+             i = i + 1
+!
+           case ('-nstep','--scan-nstep')
+             call get_command_argument(i,next,status=io)
+             read(next,*) nstep
+             i = i + 1
+!
            case ('-fsig','-fsigma','--factor-sig','--factor-sigma')
              call get_command_argument(i,next,status=io)
              read(next,*) fsig
@@ -1149,6 +1168,14 @@
              call get_command_argument(i,next,status=io)
              read(next,*) feps
              i = i + 1
+!
+           case ('-pquad','-principal-quad','--principal-quad',        &
+                                '--principal-quadruplets','--principal')
+             fquad = .TRUE.
+!
+           case ('-nopquad','-noprincipal-quad','--noprincipal-quad',  &
+                            '--noprincipal-quadruplets','--noprincipal')
+             fquad = .FALSE.
 !
            case ('-s','-sym','-symm','--symmetrize','--symm','--sym')
              fsymm = .TRUE.
@@ -1207,7 +1234,7 @@
        write(*,'(1X,20("-"))')
        write(*,*)
        write(*,'(2X,A)') '-h,--help                    Print usage'//  &
-                                                  ' informtion and exit'
+                                                 ' information and exit'
        write(*,*)
        write(*,'(2X,A)') '-f,--file                    Input file name'
        write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
@@ -1216,7 +1243,9 @@
                                                            'cs topology'
        write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  & 
                                                           'acs topology'
+       write(*,*) 
        write(*,'(2X,A)') '-qc,--qmout                  QC input file name'
+       write(*,'(2X,A)') '-dir,--qmdir                 QC data directory'
        write(*,*) 
        write(*,'(2X,A)') '-sysname,--system-name       System name'  
        write(*,'(2X,A)') '-resname,--residue-name      Molecule name'  
@@ -1226,6 +1255,9 @@
        write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'
        write(*,'(2X,A)') '-iroute,--iroute             Functional '//  &
                                                         'form of the FF'
+       write(*,'(2X,A)') '-[no]pquad,--[no]principal   Include onl'//  &
+                                               'y principal quadruplets'       
+       write(*,*) 
        write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  &
                                                        'output topology'  
        write(*,'(2X,A)') '-[no]pairs,--[no]intranb     Add pairs'
@@ -1244,6 +1276,11 @@
                                                             'correction'
        write(*,'(2X,A)') '-chrg,--charge               Molecular charge'
        write(*,'(2X,A)') '-mult,--multiplicity         Spin multiplicity'
+       write(*,*)
+       write(*,'(2X,A)') '-nstep,--scan-nstep          Number of s'//  &
+                                              'tep for the relaxed scan'
+       write(*,'(2X,A)') '-step,--scan-step            Step size f'//  &
+                                                   'or the relaxed scan'
        write(*,*)
        write(*,'(2X,A)') '-v,--verbose                 Debug mode'
        write(*,*)

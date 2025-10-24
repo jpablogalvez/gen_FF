@@ -145,6 +145,7 @@
          integer,dimension(:),allocatable           ::  idimpro  !
          integer,dimension(:),allocatable           ::  idinv    !
          integer,dimension(:),allocatable           ::  mapquad  !
+         integer,dimension(:),allocatable           ::  ich3     !
          integer                                    ::  nquad    !
          integer                                    ::  ndihe    !
          integer                                    ::  nflexi   !

@@ -613,7 +613,7 @@
 ! This subroutine 
 !
        subroutine genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,  &
-                              lch3,znum,bonded,dihed,iroute,debug)
+                              lch3,ich3,znum,bonded,dihed,iroute,debug)
 !
        use datatypes, only: grobonded,                                 &
                             dihedrals
@@ -625,6 +625,7 @@
        type(grobonded),intent(inout)                      ::  bonded    !
        type(dihedrals),intent(inout)                      ::  dihed     !
        real(kind=8),dimension(3,nat),intent(in)           ::  coord     !  Atomic coordinates
+       integer,dimension(:,:),allocatable,intent(out)     ::  ich3      ! 
        integer,dimension(nat),intent(in)                  ::  idat      ! 
        logical,dimension(nat,nat),intent(in)              ::  adj       !  Boolean adjacency 
        logical,dimension(nat,nat),intent(in)              ::  lcycle    !  Bonds belonging to rings
@@ -659,7 +660,7 @@
 !
        if ( nat .gt. 3 ) then
          call gendihe(nat,adj,idat,nidat,coord,znum,lcycle,lrigid,     &
-                      lch3,bonded%nbond,bonded%ibond,bonded%nang,      &
+                      lch3,ich3,bonded%nbond,bonded%ibond,bonded%nang, &
                       bonded%iang,adjang,edgeang,dihed,iroute,debug)
        end if
 !
@@ -819,8 +820,8 @@
 ! This subroutine 
 !
        subroutine gendihe(nat,adj,idat,nidat,coord,znum,lcycle,        &
-                          lrigid,lch3,nbond,ibond,nang,iang,adjang,    &
-                          edgeang,dihed,iroute,debug)
+                          lrigid,lch3,ich3,nbond,ibond,nang,iang,      &
+                          adjang,edgeang,dihed,iroute,debug)
 !
        use datatypes, only: dihedrals
        use graphtools
@@ -834,7 +835,8 @@
        logical,dimension(nat,nat),intent(in)              ::  adj      !
        logical,dimension(nat,nat),intent(in)              ::  lcycle   !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)              ::  lrigid   !  Rigid bonds
-       logical,dimension(:),allocatable,intent(out)     ::  lch3     !
+       logical,dimension(:),allocatable,intent(out)       ::  lch3     !
+       integer,dimension(:,:),allocatable,intent(out)     ::  ich3     !
        integer,dimension(nat),intent(in)                  ::  idat     ! 
        integer,dimension(nat),intent(in)                  ::  znum     ! 
        integer,intent(in)                                 ::  nat      !  Number of atoms
@@ -904,7 +906,7 @@
        dihed%kflexi(:)   = 0.0d0
        dihed%nflexi      = 0
 !
-       allocate(lch3(ndihe))
+       allocate(lch3(ndihe),ich3(3,ndihe))
 !
        allocate(edges(2,ndihe))
 !
@@ -914,7 +916,7 @@
 !
        call setdihe(nat,adj,idat,nidat,coord,nbond,ibond,nang,         &
                     edgeang,iang,ndihe,dihed,edges,lcycle,lrigid,      &
-                    lch3,znum,iroute)
+                    lch3,ich3,znum,iroute,debug)
 !
 ! Removing 3-member cycle dihedrals  ! TODO
 !
@@ -1302,7 +1304,7 @@
 !
        subroutine setdihe(nat,adj,idat,nidat,coord,nbond,ibond,nang,   &
                           edgeang,iang,ndihe,dihed,edgedihe,lcycle,    &
-                          lrigid,lch3,znum,iroute)
+                          lrigid,lch3,ich3,znum,iroute,debug)
 !
        use datatypes,   only: dihedrals
        use genfftools
@@ -1317,10 +1319,12 @@
        logical,dimension(nat,nat),intent(in)     ::  lcycle    !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)     ::  lrigid    !  Bonds belonging to rings
        logical,dimension(ndihe),intent(out)      ::  lch3      !
+       integer,dimension(3,ndihe),intent(out)    ::  ich3      ! 
        integer,dimension(nat),intent(in)         ::  idat      ! 
        integer,dimension(nat),intent(in)         ::  znum      ! 
        integer,intent(in)                        ::  nidat     !
        integer,intent(in)                        ::  nat       !
+       logical,intent(in)                        ::  debug     !
 !
        integer,dimension(2,nbond),intent(in)     ::  ibond     !  
        integer,intent(in)                        ::  nbond     !
@@ -1677,9 +1681,9 @@
 ! Generating Fourier series for each flexible dihedral
 ! ----------------------------------------------------
 !
-       call genquad(nat,znum,dihed,ndihe)
+       call genquad(nat,znum,dihed,ndihe,debug)
 !
-       call genmethlist(nat,adj,znum,dihed,dihed%ndihe,lch3)
+       call genmethlist(nat,adj,znum,dihed,dihed%ndihe,lch3,ich3,debug)
 !
 ! TODO: option to keep only one quadruplet per torsion
 !
@@ -1716,8 +1720,6 @@
          end if
 !
        end do
-!
-       dihed%ndihe = dihed%nrigid + dihed%ninv + dihed%nimpro + dihed%nflexi
 !
        return
        end subroutine setdihe
