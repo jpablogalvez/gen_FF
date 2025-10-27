@@ -51,6 +51,7 @@
        character(len=lentag)                           ::  formt    !  QC  output format
        logical                                         ::  fqmout   !
        logical                                         ::  fqmscan  !
+       logical                                         ::  fstep2   !
 !
        character(len=20)                               ::  meth     !
        character(len=20)                               ::  basis    !
@@ -703,6 +704,9 @@
 !
        if ( dihe%nquad .gt. 1 ) call selectquad(nat,dihe%nquad,dihe,   &
                                                  idat,nidat,debug) 
+!
+       fstep2 = .TRUE.
+!
        do i = 1, dihe%nquad
 !
          write(cnum,'(I2.2)') i
@@ -710,6 +714,8 @@
          cname = trim(bas)//'_scan-'//trim(cnum)
 !
          INQUIRE(FILE=trim(qmdir)//trim(cname)//'.log',EXIST=fqmscan)
+!
+         fstep2 = fstep2 .and. fqmscan
 !
          if ( .NOT. fqmscan ) then
            call genscan(i,nat,lab,coord,dihe%nquad,dihe%iquad,nstep,   &
@@ -752,7 +758,7 @@
 !
        call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
                         fpairs,fsymm)
-       if ( dihe%nflexi .gt. 0 ) then
+       if ( (dihe%nflexi.gt.0) .and fstep2 ) then
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
                           fsymm,intop,top%bonded,dihe,nstep)
        end if
