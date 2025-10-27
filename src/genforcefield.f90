@@ -918,10 +918,6 @@
                     edgeang,iang,ndihe,dihed,edges,lcycle,lrigid,      &
                     lch3,ich3,znum,iroute,debug)
 !
-! Removing 3-member cycle dihedrals  ! TODO
-!
-
-!
        deallocate(edges)
 !
        return
@@ -1611,7 +1607,7 @@
              end if
            end do
 !
-! Computing equilibrium value
+! Sorting dihedral indexes
 !
            if ( idat(vaux(2)) .gt. idat(vaux(3)) ) then
 !
@@ -1637,13 +1633,25 @@
              end if
            end if
 !
+! Checking if there are 3 atoms forming an angle of 180 deg
+!
+           daux = calc_angle(coord(:,vaux(1)),coord(:,vaux(2)),        &
+                                                       coord(:,vaux(3)))
+           if ( abs(daux) .ge. 175.0d0 ) cycle
+!
+           daux = calc_angle(coord(:,vaux(2)),coord(:,vaux(3)),        &
+                                                       coord(:,vaux(4)))
+           if ( abs(daux) .ge. 175.0d0 ) cycle
+!
+! Computing equilibrium value
+!
            call Diedro(coord(:,vaux(1)),coord(:,vaux(2)),              & 
                        coord(:,vaux(3)),coord(:,vaux(4)),daux)
            daux = daux*180.0d0/pi
 !
 ! If dihedral angle is rigid classify it as improper 
 !
-           if ( lrigid(vaux(2),vaux(3)) ) then
+           if ( lrigid(vaux(2),vaux(3)) ) then  ! TODO: Removing 3-member cycle dihedrals 
 !
              dihed%nrigid = dihed%nrigid + 1
 !
@@ -1684,8 +1692,6 @@
        call genquad(nat,znum,dihed,ndihe,debug)
 !
        call genmethlist(nat,adj,znum,dihed,dihed%ndihe,lch3,ich3,debug)
-!
-! TODO: option to keep only one quadruplet per torsion
 !
 ! Generating Fourier series
 !
