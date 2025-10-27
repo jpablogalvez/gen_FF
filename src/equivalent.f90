@@ -758,7 +758,7 @@
 !
        call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
                         fpairs,fsymm)
-       if ( (dihe%nflexi.gt.0) .and fstep2 ) then
+       if ( (dihe%nflexi.gt.0) .and. fstep2 ) then
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
                           fsymm,intop,top%bonded,dihe,nstep)
        end if
