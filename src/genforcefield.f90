@@ -612,8 +612,9 @@
 !
 ! This subroutine 
 !
-       subroutine genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,  &
-                              lch3,ich3,znum,bonded,dihed,iroute,debug)
+       subroutine genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,    &
+                              lrigid,lch3,ich3,znum,bonded,dihed,      &
+                              iroute,fring,fhetero,fdouble,debug)
 !
        use datatypes, only: grobonded,                                 &
                             dihedrals
@@ -633,10 +634,14 @@
        logical,dimension(:),allocatable,intent(out)       ::  lch3      ! 
 !
        integer,dimension(nat),intent(in)                  ::  znum      !  
+       integer,dimension(nat),intent(in)                  ::  ideg      !  
        integer,intent(in)                                 ::  nidat     !
        integer,intent(in)                                 ::  nat       !  Number of atoms
 !
        integer,intent(in)                                 ::  iroute    !
+       logical,intent(in)                                 ::  fring     ! 
+       logical,intent(in)                                 ::  fhetero   ! 
+       logical,intent(in)                                 ::  fdouble   ! 
        logical,intent(in)                                 ::  debug     !  Debug mode
 !
 ! Local variables
@@ -659,9 +664,10 @@
        end if
 !
        if ( nat .gt. 3 ) then
-         call gendihe(nat,adj,idat,nidat,coord,znum,lcycle,lrigid,     &
-                      lch3,ich3,bonded%nbond,bonded%ibond,bonded%nang, &
-                      bonded%iang,adjang,edgeang,dihed,iroute,debug)
+         call gendihe(nat,adj,ideg,idat,nidat,coord,znum,lcycle,       &
+                      lrigid,lch3,ich3,bonded%nbond,bonded%ibond,      &
+                      bonded%nang,bonded%iang,adjang,edgeang,dihed,    &
+                      iroute,fring,fhetero,fdouble,debug)
        end if
 !
        deallocate(adjbond,adjang,edgeang)
@@ -819,9 +825,10 @@
 !
 ! This subroutine 
 !
-       subroutine gendihe(nat,adj,idat,nidat,coord,znum,lcycle,        &
+       subroutine gendihe(nat,adj,ideg,idat,nidat,coord,znum,lcycle,   &
                           lrigid,lch3,ich3,nbond,ibond,nang,iang,      &
-                          adjang,edgeang,dihed,iroute,debug)
+                          adjang,edgeang,dihed,iroute,fring,fhetero,   &
+                          fdouble,debug)
 !
        use datatypes, only: dihedrals
        use graphtools
@@ -839,6 +846,7 @@
        integer,dimension(:,:),allocatable,intent(out)     ::  ich3     !
        integer,dimension(nat),intent(in)                  ::  idat     ! 
        integer,dimension(nat),intent(in)                  ::  znum     ! 
+       integer,dimension(nat),intent(in)                  ::  ideg     ! 
        integer,intent(in)                                 ::  nat      !  Number of atoms
        integer,intent(in)                                 ::  nidat    !
 !
@@ -850,6 +858,9 @@
        integer,intent(in)                                 ::  nbond    !  Number of bonds
 !
        integer,intent(in)                                 ::  iroute   !
+       logical,intent(in)                                 ::  fring    ! 
+       logical,intent(in)                                 ::  fhetero  ! 
+       logical,intent(in)                                 ::  fdouble  ! 
        logical,intent(in)                                 ::  debug    !  Debug mode
 !
 ! Local variables
@@ -914,9 +925,9 @@
 !
 ! Classifying adjacent angles as proper or improper dihedrals
 !
-       call setdihe(nat,adj,idat,nidat,coord,nbond,ibond,nang,         &
+       call setdihe(nat,adj,ideg,idat,nidat,coord,nbond,ibond,nang,    &
                     edgeang,iang,ndihe,dihed,edges,lcycle,lrigid,      &
-                    lch3,ich3,znum,iroute,debug)
+                    lch3,ich3,znum,iroute,fring,fhetero,fdouble,debug)
 !
        deallocate(edges)
 !
@@ -1298,9 +1309,10 @@
 !
 ! This subroutine 
 !
-       subroutine setdihe(nat,adj,idat,nidat,coord,nbond,ibond,nang,   &
-                          edgeang,iang,ndihe,dihed,edgedihe,lcycle,    &
-                          lrigid,lch3,ich3,znum,iroute,debug)
+       subroutine setdihe(nat,adj,ideg,idat,nidat,coord,nbond,ibond,   &
+                          nang,edgeang,iang,ndihe,dihed,edgedihe,      &
+                          lcycle,lrigid,lch3,ich3,znum,iroute,fring,   &
+                          fhetero,fdouble,debug)
 !
        use datatypes,   only: dihedrals
        use genfftools
@@ -1318,6 +1330,7 @@
        integer,dimension(3,ndihe),intent(out)    ::  ich3      ! 
        integer,dimension(nat),intent(in)         ::  idat      ! 
        integer,dimension(nat),intent(in)         ::  znum      ! 
+       integer,dimension(nat),intent(in)         ::  ideg      ! 
        integer,intent(in)                        ::  nidat     !
        integer,intent(in)                        ::  nat       !
        logical,intent(in)                        ::  debug     !
@@ -1333,6 +1346,9 @@
        integer,intent(in)                        ::  ndihe     ! 
 !     
        integer,intent(in)                        ::  iroute    ! 
+       logical,intent(in)                        ::  fring     ! 
+       logical,intent(in)                        ::  fhetero   ! 
+       logical,intent(in)                        ::  fdouble   ! 
 !
 ! Local variables
 !  
@@ -1386,6 +1402,8 @@
 !
            vaux(1) = ang1(2)
 !
+           if ( ideg(vaux(1)) .ne. 3 ) cycle
+!
            if ( ang1(1) .eq. ang2(1) ) then !> sorting k,l atoms by canonical order
              vaux(2) = ang1(1)
              call checklab(vaux,ang1(3),ang2(3))
@@ -1402,7 +1420,7 @@
 !
 ! Computing equilibrium value
 !
-           if ( idat(vaux(3)) .gt. idat(vaux(4)) ) then ! TODO: move to position 1 central atom
+           if ( idat(vaux(3)) .gt. idat(vaux(4)) ) then
              itmp    = vaux(3)
              vaux(3) = vaux(4)
              vaux(4) = itmp           
@@ -1417,33 +1435,53 @@
            if ( dabs(daux) .lt. 25.0d0 ) then
 !            
              flag = .FALSE.
-             if ( iroute .eq. 1 ) then      ! planar rings, ethene, ketone, etc.
-               flag = .NOT. lcycle(vaux(1),vaux(2)) 
-             else if ( iroute .eq. 2 ) then ! planar rings and double bonds
-               flag = ( (.NOT.lcycle(vaux(1),vaux(2)))                 & ! double bonds
-                               .and. (lrigid(vaux(1),vaux(2))) )       &
-                      .or. ( ((.NOT.lcycle(vaux(1),vaux(2))))          & ! planar rings
-                                      .and. (lcycle(vaux(1),vaux(3)))  &
-                                       .and. (lcycle(vaux(1),vaux(4))) )
-             else if ( iroute .eq. 3 ) then ! only in planar rings
-               flag = ((.NOT.lcycle(vaux(1),vaux(2))))                 & ! planar rings
-                                      .and. (lcycle(vaux(1),vaux(3)))  &
-                                         .and. (lcycle(vaux(1),vaux(4)))
-             else if ( iroute .eq. 4 ) then ! only in double bonds
-               flag = (.NOT.lcycle(vaux(1),vaux(2)))                   & ! double bonds
-                                         .and. (lrigid(vaux(1),vaux(2)))
-             else if ( iroute .eq. 5 ) then ! only in ketone, imine, etc.
-               flag = (.NOT.lcycle(vaux(1),vaux(2)))                   &
-                                        .and. lrigid(vaux(1),vaux(2))  &
-                                              .and. (znum(vaux(2)).gt.6) 
-             else if ( iroute .eq. 6 ) then ! planar rings and double bonds
-               flag = ( (.NOT.lcycle(vaux(1),vaux(2)))                 & ! ketone, imine, etc.
-                               .and. (lrigid(vaux(1),vaux(2)))         &
-                                    .and. (znum(vaux(2)).gt.6) )       &
-                      .or. ( ((.NOT.lcycle(vaux(1),vaux(2))))          & ! planar rings
+!
+             if ( fring ) then ! planar rings
+               flag = flag .or. ( (.NOT.lcycle(vaux(1),vaux(2)))       & 
                                       .and. (lcycle(vaux(1),vaux(3)))  &
                                        .and. (lcycle(vaux(1),vaux(4))) )
              end if
+!
+             if ( fhetero ) then  ! ketone, imine, etc.
+               flag = flag .or. ( (.NOT.lcycle(vaux(1),vaux(2)))       &
+                               .and. (lrigid(vaux(1),vaux(2)))         &
+                               .and. (znum(vaux(2)).gt.6) )
+             end if
+!
+             if ( fdouble ) then  ! C=C double bonds
+               flag = flag .or. ( (.NOT.lcycle(vaux(1),vaux(2)))       &
+                               .and. (lrigid(vaux(1),vaux(2)))         &
+                               .and. (znum(vaux(1)).eq.6)              &
+                               .and. (znum(vaux(2)).eq.6) )
+             end if
+!
+!~              if ( iroute .eq. 1 ) then      ! planar rings, ethene, ketone, etc.
+!~                flag = .NOT. lcycle(vaux(1),vaux(2)) 
+!~              else if ( iroute .eq. 2 ) then ! planar rings and double bonds
+!~                flag = ( (.NOT.lcycle(vaux(1),vaux(2)))                 & ! double bonds
+!~                                .and. (lrigid(vaux(1),vaux(2))) )       &
+!~                       .or. ( ((.NOT.lcycle(vaux(1),vaux(2))))          & ! planar rings
+!~                                       .and. (lcycle(vaux(1),vaux(3)))  &
+!~                                        .and. (lcycle(vaux(1),vaux(4))) )
+!~              else if ( iroute .eq. 3 ) then ! only in planar rings
+!~                flag = ((.NOT.lcycle(vaux(1),vaux(2))))                 & ! planar rings
+!~                                       .and. (lcycle(vaux(1),vaux(3)))  &
+!~                                          .and. (lcycle(vaux(1),vaux(4)))
+!~              else if ( iroute .eq. 4 ) then ! only in double bonds
+!~                flag = (.NOT.lcycle(vaux(1),vaux(2)))                   & ! double bonds
+!~                                          .and. (lrigid(vaux(1),vaux(2)))
+!~              else if ( iroute .eq. 5 ) then ! only in ketone, imine, etc.
+!~                flag = (.NOT.lcycle(vaux(1),vaux(2)))                   &
+!~                                         .and. lrigid(vaux(1),vaux(2))  &
+!~                                               .and. (znum(vaux(2)).gt.6) 
+!~              else if ( iroute .eq. 6 ) then ! planar rings and double bonds
+!~                flag = ( (.NOT.lcycle(vaux(1),vaux(2)))                 & ! ketone, imine, etc.
+!~                                .and. (lrigid(vaux(1),vaux(2)))         &
+!~                                     .and. (znum(vaux(2)).gt.6) )       &
+!~                       .or. ( ((.NOT.lcycle(vaux(1),vaux(2))))          & ! planar rings
+!~                                       .and. (lcycle(vaux(1),vaux(3)))  &
+!~                                        .and. (lcycle(vaux(1),vaux(4))) )
+!~              end if
 !
              if ( flag ) then
 !
@@ -1458,7 +1496,7 @@
 !
 ! If dihedral angle deviates from planarity classify it as inversion  
 !
-           else if ( znum(vaux(1)) .eq. 7 ) then ! TODO: only inversion in amines
+           else if ( znum(vaux(1)) .gt. 6 ) then ! TODO: only inversion in amines
 !
              dihed%ninv = dihed%ninv + 1
 !

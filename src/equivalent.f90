@@ -34,6 +34,9 @@
        integer                                         ::  nmol     !  
        integer                                         ::  knei     !  Maximum distance from source node
        integer                                         ::  iroute   !  
+       logical                                         ::  fring    !  
+       logical                                         ::  fhetero  !  
+       logical                                         ::  fdouble  !  
        logical                                         ::  fquad    !
        logical                                         ::  fsymm    !
        logical                                         ::  fpairs   !
@@ -147,7 +150,7 @@
        call command_line(inp,ref,intop,topout,qmout,qmdir,knei,        &
                          iroute,formt,meth,basis,disp,chrg,mult,step,  &
                          nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
-                         fpairs,fexcl,fquad,debug)
+                         fpairs,fexcl,fquad,fring,fhetero,fdouble,debug)
 !
 ! Defaults
 !
@@ -651,8 +654,9 @@
 !
        if ( fqmout ) then
 !
-         call genffbonded(nat,idat,nidat,coord,adj,lcycle,lrigid,      &
-                          lch3,ich3,znum,top%bonded,dihe,iroute,debug)
+         call genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,lrigid, &
+                          lch3,ich3,znum,top%bonded,dihe,iroute,fring, &
+                          fhetero,fdouble,debug)
 !
        else
 !
@@ -943,7 +947,8 @@
        subroutine command_line(inp,ref,top,topout,qmout,qmdir,knei,    &
                                iroute,formt,meth,basis,disp,chrg,mult, & 
                                step,nstep,sysname,resname,nmol,fsig,   &
-                               feps,fsymm,fpairs,fexcl,fquad,debug)
+                               feps,fsymm,fpairs,fexcl,fquad,fring,    &
+                               fhetero,fdouble,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -973,6 +978,9 @@
        logical,intent(out)                ::  fsymm    !  
        logical,intent(out)                ::  fpairs   !  
        logical,intent(out)                ::  fexcl    !  
+       logical,intent(out)                ::  fring    !  
+       logical,intent(out)                ::  fhetero  !  
+       logical,intent(out)                ::  fdouble  !  
 !
        character(len=20),intent(out)      ::  meth     !
        character(len=20),intent(out)      ::  basis    !
@@ -1003,8 +1011,12 @@
        nmol    = -1
 !
        knei   = -1
-       iroute = 1
        fquad  = .TRUE.
+!
+       iroute = 1
+       fring   = .TRUE.
+       fhetero = .TRUE.
+       fdouble = .TRUE.
 !
        formt  = 'g16'
        step  = 15.0
@@ -1175,6 +1187,24 @@
              read(next,*) feps
              i = i + 1
 !
+           case ('-oop-ring','--oop-ring','--star-ring')
+             fring = .TRUE.
+!
+           case ('-nooop-ring','--nooop-ring','--nostar-ring')
+             fring = .FALSE.
+!
+           case ('-oop-ketone','--oop-ketone','--star-ketone')
+             fhetero = .TRUE.
+!
+           case ('-nooop-ketone','--nooop-ketone','--nostar-ketone')
+             fhetero = .FALSE.
+!
+           case ('-oop-double','--oop-double','--star-double')
+             fdouble = .TRUE.
+!
+           case ('-nooop-double','--nooop-double','--nostar-double')
+             fdouble = .FALSE.
+!
            case ('-pquad','-principal-quad','--principal-quad',        &
                                 '--principal-quadruplets','--principal')
              fquad = .TRUE.
@@ -1242,38 +1272,59 @@
        write(*,'(2X,A)') '-h,--help                    Print usage'//  &
                                                  ' information and exit'
        write(*,*)
+       write(*,'(A)') 'GENERAL INPUT FILES'
        write(*,'(2X,A)') '-f,--file                    Input file name'
        write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
                                                            'inates name'
+       write(*,'(2X,A)') '-r,--reference-topology      Reference G'//  & ! TODO: to be implemented
+                                                       'romacs topology'
        write(*,'(2X,A)') '-p,--input-topology          Input Groma'//  &
                                                            'cs topology'
        write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  & 
                                                           'acs topology'
        write(*,*) 
+       write(*,'(A)') 'QC DATA FILES'
        write(*,'(2X,A)') '-qc,--qmout                  QC input file name'
        write(*,'(2X,A)') '-dir,--qmdir                 QC data directory'
        write(*,*) 
+       write(*,'(A)') 'SYSTEM INFORMATION'
        write(*,'(2X,A)') '-sysname,--system-name       System name'  
        write(*,'(2X,A)') '-resname,--residue-name      Molecule name'  
        write(*,'(2X,A)') '-nmol,--number-molecules     Number of m'//  &
                                                 'olecules in the system'  
        write(*,*) 
-       write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'
-       write(*,'(2X,A)') '-iroute,--iroute             Functional '//  &
-                                                        'form of the FF'
-       write(*,'(2X,A)') '-[no]pquad,--[no]principal   Include onl'//  &
-                                               'y principal quadruplets'       
+       write(*,'(A)') 'ALGORITHM OPTIONS'
+       write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'  
        write(*,*) 
-       write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  &
-                                                       'output topology'  
+       write(*,'(A)') 'FUNCTIONAL FORM OF THE FF'
+       write(*,'(2X,A)') '-[no]pquad,--[no]principal   Include onl'//  &
+                                               'y principal quadruplets'     
+       write(*,'(2X,A)') '--[no]star-ring              Add star li'//  &
+                                           'ke dieds. in aromatic rings'
+       write(*,'(2X,A)') '--[no]star-ketone            Add star li'//  &
+                                      'ke dieds. in ketone, imine, etc.'
+       write(*,'(2X,A)') '--[no]star-double            Add star li'//  &
+                                         'ke dieds. in C=C double bonds'
+       write(*,*) 
+       write(*,'(A)') 'INTRAMOLEULAR NONBONDED INTERACTIONS'
        write(*,'(2X,A)') '-[no]pairs,--[no]intranb     Add pairs'
        write(*,'(2X,A)') '-[no]excl,--[no]exclusions   Add exclusions'
+       write(*,*) 
+       write(*,'(A)') 'EQUILIBRIUM VALUES'
+       write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  & ! TODO: to be implemented
+                                                       'output topology'  
+       write(*,'(2X,A)') '-[no]ideal,--[no]idealval    Set ideal e'//  & ! TODO: to be implemented
+                                                     'quilibrium values'  
        write(*,*)
+       write(*,'(A)') 'NONBONDED INTERACTIONS MANIPULATION'
        write(*,'(2X,A)') '-fsig,--factor-sigma         Scale sigma'//  &
                                                                ' values'
        write(*,'(2X,A)') '-feps,--factor-epsilon       Scale epsil'//  &
                                                              'on values'
+       write(*,'(2X,A)') '-fcoul,--factor-coulomb      Scale parti'//  & ! TODO: to be implemented
+                                                     'al charges values'
        write(*,*)
+       write(*,'(A)') 'OPTIONS FOR QC INPUT FILES'
        write(*,'(2X,A)') '-fmt,--format                Format of QC input'
        write(*,'(2X,A)') '                              ( gaussian | orca )'
        write(*,'(2X,A)') '-meth,--method               QM method'
@@ -1288,6 +1339,7 @@
        write(*,'(2X,A)') '-step,--scan-step            Step size f'//  &
                                                    'or the relaxed scan'
        write(*,*)
+       write(*,'(A)') 'ADDITIONAL OPTIONS'
        write(*,'(2X,A)') '-v,--verbose                 Debug mode'
        write(*,*)
 !
