@@ -1421,8 +1421,8 @@
                flag = .NOT. lcycle(vaux(1),vaux(2)) 
              else if ( iroute .eq. 2 ) then ! planar rings and double bonds
                flag = ( (.NOT.lcycle(vaux(1),vaux(2)))                 & ! double bonds
-                               .and. (lrigid(vaux(1),vaux(2))) ) .or.  &
-                        ( ((.NOT.lcycle(vaux(1),vaux(2))))             & ! planar rings
+                               .and. (lrigid(vaux(1),vaux(2))) )       &
+                      .or. ( ((.NOT.lcycle(vaux(1),vaux(2))))          & ! planar rings
                                       .and. (lcycle(vaux(1),vaux(3)))  &
                                        .and. (lcycle(vaux(1),vaux(4))) )
              else if ( iroute .eq. 3 ) then ! only in planar rings
@@ -1432,10 +1432,17 @@
              else if ( iroute .eq. 4 ) then ! only in double bonds
                flag = (.NOT.lcycle(vaux(1),vaux(2)))                   & ! double bonds
                                          .and. (lrigid(vaux(1),vaux(2)))
-             else if ( iroute .eq. 4 ) then ! only in ketone, imine, etc.
+             else if ( iroute .eq. 5 ) then ! only in ketone, imine, etc.
                flag = (.NOT.lcycle(vaux(1),vaux(2)))                   &
                                         .and. lrigid(vaux(1),vaux(2))  &
                                               .and. (znum(vaux(2)).gt.6) 
+             else if ( iroute .eq. 6 ) then ! planar rings and double bonds
+               flag = ( (.NOT.lcycle(vaux(1),vaux(2)))                 & ! ketone, imine, etc.
+                               .and. (lrigid(vaux(1),vaux(2)))         &
+                                    .and. (znum(vaux(2)).gt.6) )       &
+                      .or. ( ((.NOT.lcycle(vaux(1),vaux(2))))          & ! planar rings
+                                      .and. (lcycle(vaux(1),vaux(3)))  &
+                                       .and. (lcycle(vaux(1),vaux(4))) )
              end if
 !
              if ( flag ) then
