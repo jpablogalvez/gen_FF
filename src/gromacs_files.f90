@@ -292,10 +292,82 @@
          call print_end()
        end if
 !
+! Reading optional nonbonded sections from the reference topology
+!
+       rewind(unitop)
+       call read_top_section(unitop,'[ pairs ]',top%nonbonded%pairs,   &
+                             top%nonbonded%npairs)
+       rewind(unitop)
+       call read_top_section(unitop,'[ exclusions ]',                  &
+                             top%nonbonded%exclusions,                 &
+                             top%nonbonded%nexcl)
+!
        close(unitop)
 !
        return
        end subroutine read_top
+!
+!======================================================================!
+!
+       subroutine read_top_section(unitop,key,section,nsection)
+!
+       implicit none
+!
+! Input/output variables
+!
+       character(len=*),intent(in)                         ::  key      !
+       character(len=lenline),dimension(:),allocatable,     &
+                         intent(out)                       ::  section  !
+       integer,intent(in)                                  ::  unitop   !
+       integer,intent(out)                                 ::  nsection !
+!
+! Local variables
+!
+       character(len=lenline)                              ::  line     !
+       integer                                             ::  io       !
+       integer                                             ::  i        !
+!
+! Reading optional raw Gromacs topology section
+! ---------------------------------------------
+!
+       nsection = 0
+!
+       call find_key(unitop,key,line,io)
+       if ( io .ne. 0 ) return
+!
+       do
+         read(unitop,'(A)',iostat=io) line
+         if ( io /= 0 ) exit
+         if ( len_trim(line) .eq. 0 ) cycle
+         line = adjustl(line)
+         if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
+         if ( line(1:1) .eq. '[' ) exit
+         nsection = nsection + 1
+       end do
+!
+       if ( nsection .eq. 0 ) return
+!
+       allocate(section(nsection))
+!
+       rewind(unitop)
+       call find_key(unitop,key,line,io)
+!
+       i = 0
+       do while ( i .lt. nsection )
+         read(unitop,'(A)',iostat=io) line
+         if ( io /= 0 ) exit
+         if ( len_trim(line) .eq. 0 ) cycle
+         line = adjustl(line)
+         if ( line(1:1) .eq. ';' ) cycle
+         if ( line(1:1) .eq. '#' ) cycle
+         if ( line(1:1) .eq. '[' ) exit
+         i = i + 1
+         section(i) = trim(line)
+       end do
+!
+       return
+       end subroutine read_top_section
 !
 !======================================================================!
 !
@@ -678,12 +750,20 @@
 !
 ! Printing pairs section
 !
-       if ( fpairs ) call print_pairs(uni,nat,itype,mindis,top%def,    &
-                                     top%attype,top%mol,top%atom)
+       if ( top%nonbonded%npairs .gt. 0 ) then
+         call print_ref_pairs(uni,top%nonbonded)
+       else if ( fpairs ) then
+         call print_pairs(uni,nat,itype,mindis,top%def,                &
+                          top%attype,top%mol,top%atom)
+       end if
 !
 ! Printing exclusions section
 !
-       if ( fexcl) call print_exclusions(uni,nat)
+       if ( top%nonbonded%nexcl .gt. 0 ) then
+         call print_ref_exclusions(uni,top%nonbonded)
+       else if ( fexcl ) then
+         call print_exclusions(uni,nat)
+       end if
 !
 ! Printing topology file tail
 !
@@ -1065,6 +1145,68 @@
 !
        return
        end subroutine print_exclusions
+!
+!======================================================================!
+!
+       subroutine print_ref_pairs(uni,nonbonded)
+!
+       use datatypes, only: grononbonded
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(grononbonded),intent(in)     ::  nonbonded !
+       integer,intent(in)                ::  uni       !
+!
+! Local variables
+!
+       integer                           ::  i         !
+!
+! Printing pairs section from reference Gromacs topology
+! ------------------------------------------------------
+!
+       write(uni,'(A)') '; Nonbonded pairs from reference topology'
+       write(uni,'(A)') '[ pairs ]'
+!
+       do i = 1, nonbonded%npairs
+         write(uni,'(A)') trim(nonbonded%pairs(i))
+       end do
+       write(uni,*)
+!
+       return
+       end subroutine print_ref_pairs
+!
+!======================================================================!
+!
+       subroutine print_ref_exclusions(uni,nonbonded)
+!
+       use datatypes, only: grononbonded
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(grononbonded),intent(in)     ::  nonbonded !
+       integer,intent(in)                ::  uni       !
+!
+! Local variables
+!
+       integer                           ::  i         !
+!
+! Printing exclusions section from reference Gromacs topology
+! -----------------------------------------------------------
+!
+       write(uni,'(A)') '; Exclusions from reference topology'
+       write(uni,'(A)') '[ exclusions ]'
+!
+       do i = 1, nonbonded%nexcl
+         write(uni,'(A)') trim(nonbonded%exclusions(i))
+       end do
+       write(uni,*)
+!
+       return
+       end subroutine print_ref_exclusions
 !
 !======================================================================!
 !

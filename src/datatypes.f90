@@ -96,6 +96,13 @@
          integer                                    ::  mdihe    !  Multiplicity
        end type grobonded
 !
+       type grononbonded
+         character(len=lenline),dimension(:),allocatable ::  pairs    !
+         character(len=lenline),dimension(:),allocatable ::  exclusions !
+         integer                                    ::  npairs = 0 !
+         integer                                    ::  nexcl  = 0 !
+       end type grononbonded
+!
        type torsion
          character(len=50)                          ::  labtor   !
          real(kind=8)                               ::  vtor     !  Torsional potential
@@ -166,6 +173,7 @@
          type(groatoms)                             ::  atom     !  Definition of the molecule
          type(gromolecule)                          ::  mol      !  Definition of the molecule
          type(grobonded)                            ::  bonded   !  Bonded interactions
+         type(grononbonded)                         ::  nonbonded !  Nonbonded exclusions/pairs
          integer                                    ::  nat      !
          integer                                    ::  nstiff   !
          integer                                    ::  nsoft    !
