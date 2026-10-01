@@ -590,6 +590,7 @@
 !
          top%def = reftop%def ! Defaults already specified
          top%mol = reftop%mol ! Exclusions already specified (TODO: select exclusions)
+         top%nonbonded = reftop%nonbonded
 !
          if ( trim(resname) .eq. '[no]' ) then
            top%mol%resname = reftop%mol%resname

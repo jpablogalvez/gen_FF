@@ -1310,7 +1310,7 @@ write(*,*)
          nout = 0
        end if
 !
-       if ( is_valid_degree2_exocyclic(nat,coord,adj,ideg,lrigid,exo,ring) ) then
+       if ( is_valid_degree2_exocyclic(nat,adj,ideg,exo,ring) ) then
          ncis   = 0
          ntrans = 0
          do j = 1, nmap
@@ -1496,23 +1496,17 @@ write(*,*)
 !
 !======================================================================!
 !
-       logical function is_valid_degree2_exocyclic(nat,coord,adj,ideg,&
-                                                    lrigid,exo,ring)
+       logical function is_valid_degree2_exocyclic(nat,adj,ideg,exo,ring)
 !
        implicit none
 !
-       real(kind=8),dimension(3,nat),intent(in) ::  coord   !
        logical,dimension(nat,nat),intent(in)    ::  adj     !
-       logical,dimension(nat,nat),intent(in)    ::  lrigid  !
        integer,dimension(nat),intent(in)        ::  ideg    !
        integer,intent(in)                       ::  nat     !
        integer,intent(in)             ::  exo    !
        integer,intent(in)             ::  ring   !
 !
-       real(kind=8)                   ::  angle  !
        integer                        ::  other  !
-!
-       real(kind=8),parameter         ::  pi = 4*atan(1.0_8)
 !
        is_valid_degree2_exocyclic = .FALSE.
 !
@@ -1521,11 +1515,12 @@ write(*,*)
        other = other_exocyclic_neighbor(nat,adj,exo,ring)
        if ( other .lt. 1 ) return
 !
-       angle = calc_angle(coord(:,ring),coord(:,exo),coord(:,other))    &
-               * 180.0d0 / pi
 !
-       is_valid_degree2_exocyclic = lrigid(exo,other)                  &
-                                    .or. (angle.ge.160.0d0)
+!      For degree-2 ring-exocyclic bonds the cis/trans selection is decided
+!      by select_ring_exocyclic itself.  Reaching this point only states that
+!      the exocyclic atom has exactly one additional neighbour.
+!
+       is_valid_degree2_exocyclic = .TRUE.
 !
        return
        end function is_valid_degree2_exocyclic

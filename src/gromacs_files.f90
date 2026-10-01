@@ -36,7 +36,7 @@
 !
 ! Input/output variables
 !
-       type(grotop),intent(out)                      ::  top      !
+       type(grotop),intent(inout)                    ::  top      !
        character(len=leninp),intent(in)              ::  intop    !
        integer,intent(in)                            ::  unitop   !
        integer,dimension(:),allocatable,intent(out)  ::  itype    !
@@ -90,13 +90,13 @@
                 top%atom%atnr(top%nat),top%atom%resnr(top%nat),        &
                 top%atom%itype(top%nat))
 !
-       allocate(itype(top%nat))     
+       allocate(itype(top%nat))
 !
        top%atom%attype(:)   = ''
 !
        top%attype%atname(:) = ''
        top%attype%bond(:)   = ''
-       top%attype%ptype(:)  = '' 
+       top%attype%ptype(:)  = ''
 !
 ! Reading defaults section
 !
@@ -117,7 +117,7 @@
        rewind(unitop)
 !
 ! Reading atomtypes section
-! 
+!
        call find_key(unitop,'[ atomtypes ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ atomtypes ]')
 !
@@ -155,15 +155,15 @@
                         top%attype%charge(top%attype%ntype),             &
                         top%attype%ptype(top%attype%ntype),              &
                         top%attype%sig(top%attype%ntype),                &
-                        top%attype%eps(top%attype%ntype) 
+                        top%attype%eps(top%attype%ntype)
          else if ( nstr .eq. 7 ) then
            read(line,*) top%attype%atname(top%attype%ntype),             &
-                        top%attype%bond(top%attype%ntype),               & 
+                        top%attype%bond(top%attype%ntype),               &
                         top%attype%mass(top%attype%ntype),               &
                         top%attype%charge(top%attype%ntype),             &
                         top%attype%ptype(top%attype%ntype),              &
                         top%attype%sig(top%attype%ntype),                &
-                        top%attype%eps(top%attype%ntype) 
+                        top%attype%eps(top%attype%ntype)
          else
            write(*,'(2X,68("="))')
            write(*,'(3X,A)') 'ERROR:  Invalid format in [ atomtype'//  &
@@ -182,7 +182,7 @@
        rewind(unitop)
 !
 ! Reading moleculetype section
-! 
+!
        call find_key(unitop,'[ moleculetype ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ moleculetype ]')
 !
@@ -199,7 +199,7 @@
        rewind(unitop)
 !
 ! Reading atoms section
-! 
+!
        call find_key(unitop,'[ atoms ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ atoms ]')
 !
@@ -238,7 +238,7 @@
                                                       top%atom%attype(i)
            write(*,*)
            write(*,'(2X,68("="))')
-           write(*,*)  
+           write(*,*)
            call print_end()
          end if
 !
@@ -250,7 +250,7 @@
        rewind(unitop)
 !
 ! Reading system section
-! 
+!
        call find_key(unitop,'[ system ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ system ]')
 !
@@ -265,7 +265,7 @@
        read(line,*) top%mol%sysname
 !
 ! Reading molecules section
-! 
+!
        call find_key(unitop,'[ molecules ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ molecules ]')
 !
@@ -288,7 +288,7 @@
          write(*,'(3X,A)') 'Residue name specified after [ molecules ]    :',trim(resname)
          write(*,*)
          write(*,'(2X,68("="))')
-         write(*,*)  
+         write(*,*)
          call print_end()
        end if
 !
@@ -423,7 +423,7 @@
                 bonded%fbond(bonded%nbond),bonded%ibond(2,bonded%nbond))
 !
 ! Reading bonds section  ! TODO: only valid for harmonic bond and G96 bond interactions
-! 
+!
        call find_key(unitop,'[ bonds ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ bonds ]')
 !
@@ -488,7 +488,7 @@
                                                         ' topology file'
          write(*,*)
          write(*,'(2X,68("*"))')
-         write(*,*)  
+         write(*,*)
          close(unitop)
          return
        end if
@@ -513,7 +513,7 @@
                 bonded%fang(bonded%nang),bonded%iang(3,bonded%nang))
 !
 ! Reading angles section  ! TODO: only valid for harmonic bond angle interactions
-! 
+!
        call find_key(unitop,'[ angles ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ angles ]')
 !
@@ -529,7 +529,7 @@
 !
          i = i + 1
 !
-         read(line,*) bonded%iang(:,i),bonded%fang(i),                 & 
+         read(line,*) bonded%iang(:,i),bonded%fang(i),                 &
                       bonded%ang(i),bonded%kang(i)
 !
        end do
@@ -557,7 +557,7 @@
 !
 ! Local variables
 !
-       character(len=10),dimension(11)                   ::  str      !  
+       character(len=10),dimension(11)                   ::  str      !
        character(len=lenline)                            ::  line     !  Line read
        integer                                           ::  io       !
        integer                                           ::  i        !
@@ -599,7 +599,7 @@
                                                     'd in topology file'
          write(*,*)
          write(*,'(2X,68("*"))')
-         write(*,*)  
+         write(*,*)
          close(unitop)
          return
        end if
@@ -629,7 +629,7 @@
        bonded%c5(:) = 0.0d0
 !
 ! Reading dihedrals section
-! 
+!
        call find_key(unitop,'[ dihedrals ]',line,io)
        if ( io .ne. 0 ) call print_badread(intop,'[ dihedrals ]')
 !
@@ -706,7 +706,7 @@
 !
 !======================================================================!
 !
-! This subroutine 
+! This subroutine
 !
        subroutine print_top(uni,nat,itype,mindis,top,dihe,geo,         &
                             intop,topout,fpairs,fexcl)
@@ -727,8 +727,8 @@
        integer,dimension(nat),intent(in)      ::  itype    !
        integer,intent(in)                     ::  nat      !
        integer,intent(in)                     ::  uni      !
-       logical,intent(in)                     ::  fpairs   !  
-       logical,intent(in)                     ::  fexcl    !  
+       logical,intent(in)                     ::  fpairs   !
+       logical,intent(in)                     ::  fexcl    !
 !
 ! Printing Gromacs topology
 ! -------------------------
@@ -784,7 +784,7 @@
 !
 ! Input/output variables
 !
-       type(grobonded)                   ::  bonded  !  
+       type(grobonded)                   ::  bonded  !
        integer,intent(in)                ::  uni     !
 !
 ! Local variables
@@ -794,13 +794,13 @@
 ! Printing Gromacs bonds section
 ! ------------------------------
 !
-       write(uni,'(A)') '; Stretchings'     
-       write(uni,'(A)') '[ bonds ]'     
+       write(uni,'(A)') '; Stretchings'
+       write(uni,'(A)') '[ bonds ]'
 !
        do i = 1, bonded%nbond
          if ( bonded%fbond(i) .eq. 1 ) then
            write(uni,'(2X,3(1X,I3),2(3X,F12.4),12X,A,2X,I4,1X,A)')     &
-                      bonded%ibond(:,i),bonded%fbond(i),               & 
+                      bonded%ibond(:,i),bonded%fbond(i),               &
                       bonded%bond(i),bonded%kbond(i),';',bonded%sbond(i),trim(bonded%labbond(i))
          else if ( bonded%fbond(i) .eq. 5 ) then
            write(uni,'(2X,3(1X,I3))') bonded%ibond(:,i),bonded%fbond(i)
@@ -821,7 +821,7 @@
 !
 ! Input/output variables
 !
-       type(grobonded)                   ::  bonded  !  
+       type(grobonded)                   ::  bonded  !
        integer,intent(in)                ::  uni     !
 !
 ! Local variables
@@ -834,7 +834,7 @@
        write(uni,'(A)') '; Bendings'
        write(uni,'(A)') '[ angles ]'
 !
-       do i = 1, bonded%nang    
+       do i = 1, bonded%nang
          write(uni,'(2X,4(1X,I3),2(3X,F9.4),5X,A,2X,I4,1X,A)')         &
                          bonded%iang(:,i),bonded%fang(i),              &
                          bonded%ang(i),bonded%kang(i),';',bonded%sang(i),trim(bonded%labang(i))
@@ -854,7 +854,7 @@
 !
 ! Input/output variables
 !
-       type(dihedrals)                   ::  dihe  !  
+       type(dihedrals)                   ::  dihe  !
        integer,intent(in)                ::  uni   !
 !
 ! Local variables
@@ -868,7 +868,7 @@
        write(uni,'(A)') '[ dihedrals ]'
 !
        if ( dihe%nrigid .gt. 0 ) then
-         do i = 1, dihe%nrigid    
+         do i = 1, dihe%nrigid
             write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4,1X,A)')      &
                       dihe%irigid(:,i),dihe%frigid(i),dihe%drigid(i),  &
                                        dihe%krigid(i),';',dihe%srigid(i),trim(dihe%labrigid(i))
@@ -876,7 +876,7 @@
        end if
 !
        if ( dihe%nimpro .gt. 0 ) then
-         do i = 1, dihe%nimpro    
+         do i = 1, dihe%nimpro
             write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4,1X,A)')      &
                 dihe%iimpro(:,i),dihe%fimpro(i),dihe%dimpro(i),        &
                                        dihe%kimpro(i),';',dihe%simpro(i),trim(dihe%labimpro(i))
@@ -884,7 +884,7 @@
        end if
 !
        if ( dihe%ninv .gt. 0 ) then
-         do i = 1, dihe%ninv    
+         do i = 1, dihe%ninv
             write(uni,'(2X,5(1X,I3),2(1X,F9.4),5X,A,2X,I4,1X,A)')      &
                       dihe%iinv(:,i),dihe%finv(i),dihe%dinv(i),        &
                                            dihe%kinv(i),';',dihe%sinv(i),trim(dihe%labinv(i))
@@ -893,12 +893,12 @@
 !
        if ( dihe%nflexi .gt. 0 ) then
          do i = 1, dihe%nflexi
-           do j = 1, dihe%flexi(i)%ntor     
+           do j = 1, dihe%flexi(i)%ntor
               write(uni,'(2X,5(1X,I3),2(1X,F9.4),1X,I4,5X,A,2X,I4,1X,A)')   &
                 dihe%flexi(i)%itor(:),dihe%fflexi(i),                  &
                 dihe%flexi(i)%tor(j)%phase,dihe%flexi(i)%tor(j)%vtor,  &
                 dihe%flexi(i)%tor(j)%multi,';',dihe%flexi(i)%tor(j)%stor,trim(dihe%flexi(i)%tor(j)%labtor)
-           end do 
+           end do
          end do
        end if
        write(uni,*)
@@ -962,7 +962,7 @@
        write(uni,*)
 !
 ! Printing atomtypes section  ! TODO: handle virtual sites
-! 
+!
        write(uni,'(A)') '[ atomtypes ]'
        write(uni,'(A)') ';name   bond_type     mass     charge   p'//  &
                                           'type   sigma         epsilon'
@@ -971,18 +971,18 @@
                        attype%atname(i),attype%bond(i),attype%mass(i), &
                        attype%charge(i),attype%ptype(i),               &
                        attype%sig(i),attype%eps(i)
-       end do 
+       end do
        write(uni,*)
 !
 ! Printing moleculetype section
-! 
+!
        write(uni,'(A)') '[ moleculetype ]'
        write(uni,'(A)') ';name            nrexcl'
        write(uni,'(A,13X,I1)') mol%resname,mol%nrexcl
        write(uni,*)
 !
 ! Printing atoms section
-! 
+!
        write(uni,'(A)') '[ atoms ]'
        write(uni,'(A)') ';   nr  type  resi  res  atom  cgnr     c'//  &
                                                        'harge      mass'
@@ -992,7 +992,7 @@
                          atom%atnr(i),atom%attype(i),atom%resnr(i),    &
                          atom%residue(i),atom%atom(i),atom%cgnr(i),    &
                          atom%charge(i),atom%mass(i) ! TODO: read top mass or use qc output mass
-       end do                                                            
+       end do
        write(uni,*)
 !
        return
@@ -1055,14 +1055,14 @@
 !
 ! Parameters
 !
-       real(kind=8)                            ::  one = 1.0d0        
+       real(kind=8)                            ::  one = 1.0d0
 !
 ! Printing pairs section in Gromacs topology
 ! ------------------------------------------
 !
-       write(uni,'(A)') '; Nonbonded terms'          
+       write(uni,'(A)') '; Nonbonded terms'
        write(uni,'(A)') '[ pairs ]'
-       write(uni,'(A)') '; 1-4 interactions' ! TODO: think if print only 1-4 belonging to flexible dihedrals 
+       write(uni,'(A)') '; 1-4 interactions' ! TODO: think if print only 1-4 belonging to flexible dihedrals
 !
        do i = 1, nat-1
          do j = i+1,nat
@@ -1071,11 +1071,11 @@
              if ( def%comrule .eq. 1 ) then
                stop 'combrule 1 not yet implemented'
              else if ( def%comrule .eq. 2 ) then
-               V = 0.5d0*(attype%sig(itype(i)) + attype%sig(itype(j))) 
+               V = 0.5d0*(attype%sig(itype(i)) + attype%sig(itype(j)))
                W = dsqrt(attype%eps(itype(i))*attype%eps(itype(j)))    &
                                                             *def%fudgelj  ! TODO: joyce uses scaled 1-4 (without fudgelj)
              else if ( def%comrule .eq. 3 ) then
-               V = dsqrt(attype%sig(itype(i))*attype%sig(itype(j)))     
+               V = dsqrt(attype%sig(itype(i))*attype%sig(itype(j)))
                W = dsqrt(attype%eps(itype(i))*attype%eps(itype(j)))    &
                                                             *def%fudgelj  ! TODO: joyce uses scaled 1-4 (without fudgelj)
              end if
@@ -1096,11 +1096,11 @@
              if ( def%comrule .eq. 1 ) then
                stop 'combrule 1 not yet implemented'
              else if ( def%comrule .eq. 2 ) then
-               V = 0.5d0*(attype%sig(itype(i)) + attype%sig(itype(j))) 
-               W = dsqrt(attype%eps(itype(i))*attype%eps(itype(j))) 
+               V = 0.5d0*(attype%sig(itype(i)) + attype%sig(itype(j)))
+               W = dsqrt(attype%eps(itype(i))*attype%eps(itype(j)))
              else if ( def%comrule .eq. 3 ) then
-               V = dsqrt(attype%sig(itype(i))*attype%sig(itype(j))) 
-               W = dsqrt(attype%eps(itype(i))*attype%eps(itype(j))) 
+               V = dsqrt(attype%sig(itype(i))*attype%sig(itype(j)))
+               W = dsqrt(attype%eps(itype(i))*attype%eps(itype(j)))
              end if
 !
              write(uni,'(3X,3(1X,I3),3(1X,F8.5),1X,F9.4,1X,F11.5)')    &
