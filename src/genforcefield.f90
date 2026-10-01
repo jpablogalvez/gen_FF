@@ -612,9 +612,10 @@
 !
 ! This subroutine 
 !
-       subroutine genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,    &
-                              lrigid,lch3,ich3,znum,bonded,dihed,      &
-                              iroute,fring,fhetero,fdouble,debug)
+       subroutine genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,lcycle, &
+                              lrigid,laroma,latar,lch3,ich3,znum,      &
+                              bonded,dihed,iroute,fring,fhetero,       &
+                              fdouble,fnitrogen,debug)
 !
        use datatypes, only: grobonded,                                 &
                             dihedrals
@@ -626,11 +627,14 @@
        type(grobonded),intent(inout)                      ::  bonded    !
        type(dihedrals),intent(inout)                      ::  dihed     !
        real(kind=8),dimension(3,nat),intent(in)           ::  coord     !  Atomic coordinates
+       real(kind=8),dimension(nat,nat),intent(in)          ::  wiberg    !  Wiberg bond indices
        integer,dimension(:,:),allocatable,intent(out)     ::  ich3      ! 
        integer,dimension(nat),intent(in)                  ::  idat      ! 
        logical,dimension(nat,nat),intent(in)              ::  adj       !  Boolean adjacency 
        logical,dimension(nat,nat),intent(in)              ::  lcycle    !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)              ::  lrigid    ! 
+       logical,dimension(nat,nat),intent(in)              ::  laroma    !  Aromatic bonds
+       logical,dimension(nat),intent(in)                  ::  latar     !  Aromatic atoms
        logical,dimension(:),allocatable,intent(out)       ::  lch3      ! 
 !
        integer,dimension(nat),intent(in)                  ::  znum      !  
@@ -642,6 +646,7 @@
        logical,intent(in)                                 ::  fring     ! 
        logical,intent(in)                                 ::  fhetero   ! 
        logical,intent(in)                                 ::  fdouble   ! 
+       logical,intent(in)                                 ::  fnitrogen ! 
        logical,intent(in)                                 ::  debug     !  Debug mode
 !
 ! Local variables
@@ -664,10 +669,11 @@
        end if
 !
        if ( nat .gt. 3 ) then
-         call gendihe(nat,adj,ideg,idat,nidat,coord,znum,lcycle,       &
-                      lrigid,lch3,ich3,bonded%nbond,bonded%ibond,      &
-                      bonded%nang,bonded%iang,adjang,edgeang,dihed,    &
-                      iroute,fring,fhetero,fdouble,debug)
+         call gendihe(nat,adj,ideg,idat,coord,wiberg,znum,lcycle,     &
+                      lrigid,laroma,latar,lch3,ich3,bonded%nbond,      &
+                      bonded%ibond,bonded%nang,bonded%iang,adjang,     &
+                      edgeang,dihed,iroute,fring,fhetero,fdouble,      &
+                      fnitrogen,debug)
        end if
 !
        deallocate(adjbond,adjang,edgeang)
@@ -825,10 +831,10 @@
 !
 ! This subroutine 
 !
-       subroutine gendihe(nat,adj,ideg,idat,nidat,coord,znum,lcycle,   &
-                          lrigid,lch3,ich3,nbond,ibond,nang,iang,      &
-                          adjang,edgeang,dihed,iroute,fring,fhetero,   &
-                          fdouble,debug)
+       subroutine gendihe(nat,adj,ideg,idat,coord,wiberg,znum,lcycle, &
+                          lrigid,laroma,latar,lch3,ich3,nbond,ibond,   &
+                          nang,iang,adjang,edgeang,dihed,iroute,fring, &
+                          fhetero,fdouble,fnitrogen,debug)
 !
        use datatypes, only: dihedrals
        use graphtools
@@ -839,16 +845,18 @@
 !
        type(dihedrals),intent(out)                        ::  dihed    !  Equilibrium dihedral angle
        real(kind=8),dimension(3,nat),intent(in)           ::  coord    !  Atomic coordinates
+       real(kind=8),dimension(nat,nat),intent(in)          ::  wiberg   !  Wiberg bond indices
        logical,dimension(nat,nat),intent(in)              ::  adj      !
        logical,dimension(nat,nat),intent(in)              ::  lcycle   !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)              ::  lrigid   !  Rigid bonds
+       logical,dimension(nat,nat),intent(in)              ::  laroma   !  Aromatic bonds
+       logical,dimension(nat),intent(in)                  ::  latar    !  Aromatic atoms
        logical,dimension(:),allocatable,intent(out)       ::  lch3     !
        integer,dimension(:,:),allocatable,intent(out)     ::  ich3     !
        integer,dimension(nat),intent(in)                  ::  idat     ! 
        integer,dimension(nat),intent(in)                  ::  znum     ! 
        integer,dimension(nat),intent(in)                  ::  ideg     ! 
        integer,intent(in)                                 ::  nat      !  Number of atoms
-       integer,intent(in)                                 ::  nidat    !
 !
        logical,dimension(nang,nang),intent(in)            ::  adjang   !  Boolean adjacency 
        integer,dimension(2,nang),intent(in)               ::  edgeang  !
@@ -861,6 +869,7 @@
        logical,intent(in)                                 ::  fring    ! 
        logical,intent(in)                                 ::  fhetero  ! 
        logical,intent(in)                                 ::  fdouble  ! 
+       logical,intent(in)                                 ::  fnitrogen ! 
        logical,intent(in)                                 ::  debug    !  Debug mode
 !
 ! Local variables
@@ -925,9 +934,10 @@
 !
 ! Classifying adjacent angles as proper or improper dihedrals
 !
-       call setdihe(nat,adj,ideg,idat,nidat,coord,nbond,ibond,nang,    &
+       call setdihe(nat,adj,ideg,idat,coord,wiberg,nbond,ibond,nang,  &
                     edgeang,iang,ndihe,dihed,edges,lcycle,lrigid,      &
-                    lch3,ich3,znum,iroute,fring,fhetero,fdouble,debug)
+                    laroma,latar,lch3,ich3,znum,iroute,fring,fhetero,  &
+                    fdouble,fnitrogen,debug)
 !
        deallocate(edges)
 !
@@ -942,7 +952,7 @@
 !
        subroutine symffbonded(nat,nidat,idat,newlab,bonded,dihed,      &
                               r,marunit,narunit,arunit,lheavy,adj,     &
-                              fsymm,debug)
+                              fsymm,fadhocdihedeps,debug)
 !
        use datatypes,   only: grobonded,                               &
                               dihedrals
@@ -968,6 +978,7 @@
        integer,intent(in)                               ::  nidat     ! 
 !
        logical,intent(in)                               ::  fsymm     !
+       logical,intent(in)                               ::  fadhocdihedeps !
        logical,intent(in)                               ::  debug     !  Debug mode
 !
 ! Local variables
@@ -1165,7 +1176,7 @@
                       dihed%drigid,dihed%srigid,dihed%labrigid,        &
                       dihed%nimpro,dihed%iimpro,dihed%idimpro,         &
                       dihed%dimpro,dihed%simpro,dihed%labimpro,        &
-                      marunit,narunit,arunit,adj,lheavy)
+                      marunit,narunit,arunit,adj,lheavy,fadhocdihedeps)
        end if
 !
        if ( dihed%ninv .gt. 0 ) then
@@ -1173,7 +1184,7 @@
        end if 
 !
        if ( dihed%nflexi .gt. 0 ) then
-         call symtor(dihed%nflexi*10,dihed)
+         call symtor(dihed%ntor,dihed)
        end if
 !
        deallocate(ivaux)
@@ -1309,10 +1320,10 @@
 !
 ! This subroutine 
 !
-       subroutine setdihe(nat,adj,ideg,idat,nidat,coord,nbond,ibond,   &
+       subroutine setdihe(nat,adj,ideg,idat,coord,wiberg,nbond,ibond, &
                           nang,edgeang,iang,ndihe,dihed,edgedihe,      &
-                          lcycle,lrigid,lch3,ich3,znum,iroute,fring,   &
-                          fhetero,fdouble,debug)
+                          lcycle,lrigid,laroma,latar,lch3,ich3,znum,   &
+                          iroute,fring,fhetero,fdouble,fnitrogen,debug)
 !
        use datatypes,   only: dihedrals
        use genfftools
@@ -1323,15 +1334,17 @@
 !
        type(dihedrals),intent(inout)             ::  dihed     !                            
        real(kind=8),dimension(3,nat),intent(in)  ::  coord     !
+       real(kind=8),dimension(nat,nat),intent(in) ::  wiberg    !  Wiberg bond indices
        logical,dimension(nat,nat),intent(in)     ::  adj       !
        logical,dimension(nat,nat),intent(in)     ::  lcycle    !  Bonds belonging to rings
        logical,dimension(nat,nat),intent(in)     ::  lrigid    !  Bonds belonging to rings
+       logical,dimension(nat,nat),intent(in)     ::  laroma    !  Aromatic bonds
+       logical,dimension(nat),intent(in)         ::  latar     !  Aromatic atoms
        logical,dimension(ndihe),intent(out)      ::  lch3      !
        integer,dimension(3,ndihe),intent(out)    ::  ich3      ! 
        integer,dimension(nat),intent(in)         ::  idat      ! 
        integer,dimension(nat),intent(in)         ::  znum      ! 
        integer,dimension(nat),intent(in)         ::  ideg      ! 
-       integer,intent(in)                        ::  nidat     !
        integer,intent(in)                        ::  nat       !
        logical,intent(in)                        ::  debug     !
 !
@@ -1349,12 +1362,16 @@
        logical,intent(in)                        ::  fring     ! 
        logical,intent(in)                        ::  fhetero   ! 
        logical,intent(in)                        ::  fdouble   ! 
+       logical,intent(in)                        ::  fnitrogen ! 
 !
 ! Local variables
 !  
        real(kind=8),dimension(ndihe)             ::  dimpro    !
        integer,dimension(4,ndihe)                ::  iimpro    !
        integer,dimension(ndihe)                  ::  fimpro    !
+       integer,dimension(ndihe)                  ::  primpro    !
+       integer,dimension(ndihe)                  ::  refadequacy !
+       real(kind=8),dimension(ndihe)             ::  refwiberg  !
        integer                                   ::  nimpro    !
        real(kind=8),dimension(ndihe)             ::  dinv      !
        integer,dimension(4,ndihe)                ::  iinv      !
@@ -1363,21 +1380,30 @@
        logical,dimension(ndihe)                  ::  torsion   !
        logical,dimension(4)                      ::  lcheck    !
        logical                                   ::  flag      !
+       logical                                   ::  is_planar !
+       logical                                   ::  is_aromatic_ring_center !
+       logical                                   ::  is_carbonyl_like_center !
+       logical                                   ::  is_alkene_center !
+       logical                                   ::  is_planar_nitrogen_center !
        logical                                   ::  lfound    !
        real(kind=8)                              ::  daux      !
        integer,dimension(4)                      ::  vaux      !  
-       integer,dimension(4)                      ::  vaux1     !  
-       integer,dimension(4)                      ::  vaux2     ! 
        integer,dimension(2,4)                    ::  bonds     !
        integer,dimension(2)                      ::  rbond     !
        integer,dimension(3)                      ::  ang1      !
        integer,dimension(3)                      ::  ang2      !
-       integer                                   ::  id1       !
-       integer                                   ::  id2       !
+       integer,dimension(4)                      ::  target_improper_signature !
+       integer                                   ::  improper_priority !
+       integer                                   ::  reference_adequacy !
+       integer                                   ::  nimpro_candidates !
+       integer                                   ::  representative_candidate !
+       integer                                   ::  selected_candidate !
+       integer                                   ::  center_atom !
        integer                                   ::  itmp      !
        integer                                   ::  i,j,k     !  Indexes
 !
-       real(kind=8),parameter                    ::  pi =  4*atan(1.0_8) 
+       real(kind=8),parameter                    ::  pi =  4*atan(1.0_8)
+       real(kind=8),parameter                    ::  linear_angle_thr = 170.0d0
 !
 ! Finding atoms belonging to each dihedral
 ! ----------------------------------------
@@ -1420,11 +1446,9 @@
 !
 ! Computing equilibrium value
 !
-           if ( idat(vaux(3)) .gt. idat(vaux(4)) ) then
-             itmp    = vaux(3)
-             vaux(3) = vaux(4)
-             vaux(4) = itmp           
-           end if
+! Canonical terminal ordering makes the selected representative
+! independent of adjacent-angle enumeration order.
+           call canonicalize_improper_terminals(idat,vaux)
 !
            call Diedro(coord(:,vaux(1)),coord(:,vaux(2)),              & 
                        coord(:,vaux(3)),coord(:,vaux(4)),daux)
@@ -1432,27 +1456,63 @@
 !
 ! If dihedral angle is planar classify it as improper
 !
-           if ( dabs(daux) .lt. 25.0d0 ) then
+           is_planar = dabs(daux) .lt. 25.0d0
+!
+           if ( is_planar ) then
+!
+             is_carbonyl_like_center = (znum(vaux(1)).eq.6)            &
+                       .and. (.NOT.lcycle(vaux(1),vaux(2)))            &
+                       .and. lrigid(vaux(1),vaux(2))                   &
+                       .and. ((znum(vaux(2)).eq.7)                     &
+                         .or. (znum(vaux(2)).eq.8)                     &
+                         .or. (znum(vaux(2)).eq.16))
+!
+             is_alkene_center = (znum(vaux(1)).eq.6)                   &
+                       .and. (.NOT.lcycle(vaux(1),vaux(2)))            &
+                       .and. lrigid(vaux(1),vaux(2))                   &
+                       .and. (znum(vaux(2)).eq.6)
+!
+             is_aromatic_ring_center = (znum(vaux(1)).eq.6)            &
+                       .and. (.NOT.lcycle(vaux(1),vaux(2)))            &
+                       .and. (.NOT.lrigid(vaux(1),vaux(2)))            &
+                       .and. (lcycle(vaux(1),vaux(3))                  &
+                         .or. laroma(vaux(1),vaux(3)))                 &
+                       .and. (lcycle(vaux(1),vaux(4))                  &
+                         .or. laroma(vaux(1),vaux(4)))
+!
+             is_planar_nitrogen_center = (znum(vaux(1)).eq.7)          &
+                       .and. (lrigid(vaux(1),vaux(2))                  &
+                         .or. lrigid(vaux(1),vaux(3))                  &
+                         .or. lrigid(vaux(1),vaux(4))                  &
+                         .or. latar(vaux(2)) .or. latar(vaux(3))       &
+                         .or. latar(vaux(4))                           &
+                         .or. laroma(vaux(1),vaux(2))                  &
+                         .or. laroma(vaux(1),vaux(3))                  &
+                         .or. laroma(vaux(1),vaux(4)))
 !            
              flag = .FALSE.
+             improper_priority = 0
+             reference_adequacy = 1
 !
-             if ( fring ) then ! planar rings
-               flag = flag .or. ( (.NOT.lcycle(vaux(1),vaux(2)))       & 
-                                      .and. (lcycle(vaux(1),vaux(3)))  &
-                                       .and. (lcycle(vaux(1),vaux(4))) )
-             end if
-!
-             if ( fhetero ) then  ! ketone, imine, etc.
-               flag = flag .or. ( (.NOT.lcycle(vaux(1),vaux(2)))       &
-                               .and. (lrigid(vaux(1),vaux(2)))         &
-                               .and. (znum(vaux(2)).gt.6) )
-             end if
-!
-             if ( fdouble ) then  ! C=C double bonds
-               flag = flag .or. ( (.NOT.lcycle(vaux(1),vaux(2)))       &
-                               .and. (lrigid(vaux(1),vaux(2)))         &
-                               .and. (znum(vaux(1)).eq.6)              &
-                               .and. (znum(vaux(2)).eq.6) )
+             if ( fhetero .and. is_carbonyl_like_center ) then
+               flag = .TRUE.
+               improper_priority = 1
+               reference_adequacy = 0
+             else if ( fdouble .and. is_alkene_center ) then
+               flag = .TRUE.
+               improper_priority = 2
+               reference_adequacy = 0
+             else if ( fring .and. is_aromatic_ring_center ) then
+               flag = .TRUE.
+               improper_priority = 3
+               reference_adequacy = 0
+             else if ( fnitrogen .and. is_planar_nitrogen_center ) then
+               flag = .TRUE.
+               improper_priority = 4
+! Prefer the conjugated N neighbour as the oriented reference.  A
+! candidate with another reference is retained only as a fallback.
+               if ( lrigid(vaux(1),vaux(2)) .or. latar(vaux(2))       &
+                    .or. laroma(vaux(1),vaux(2)) ) reference_adequacy = 0
              end if
 !
 !~              if ( iroute .eq. 1 ) then      ! planar rings, ethene, ketone, etc.
@@ -1490,13 +1550,16 @@
                dihed%iimpro(:,dihed%nimpro) = vaux(:)
                dihed%fimpro(dihed%nimpro)   = 2
                dihed%dimpro(dihed%nimpro)   = 0.0d0    ! TODO: option to pick equilibrium value or set to 0
+               primpro(dihed%nimpro)         = improper_priority
+               refadequacy(dihed%nimpro)     = reference_adequacy
+               refwiberg(dihed%nimpro)       = wiberg(vaux(1),vaux(2))
 !~                dihed%dimpro(dihed%nimpro)   = daux  ! TODO: option to pick equilibrium value or set to 0
 !
              end if
 !
 ! If dihedral angle deviates from planarity classify it as inversion  
 !
-           else if ( znum(vaux(1)) .gt. 6 ) then ! TODO: only inversion in amines
+           else if ( znum(vaux(1)) .eq. 7 ) then
 !
              dihed%ninv = dihed%ninv + 1
 !
@@ -1511,42 +1574,97 @@
 !
        end do
 !
-! Keep only one improper dihedral per central atom
+! Keep one improper per physical center, with a common oriented chemical
+! signature for all centers sharing the same atom type.  The representative
+! is selected with the existing chemical/Wiberg comparator; each equivalent
+! center must then reproduce its idat(1:4) signature.
 !
+       nimpro_candidates = dihed%nimpro
        nimpro = 0
-       do i = 1, dihed%nimpro
+
+! Find the best representative for each central atom type.
+       do i = 1, nimpro_candidates
          flag = .FALSE.
-         do j = 1, nimpro
-           if ( dihed%iimpro(1,i) .eq. iimpro(1,j) ) then
+         do j = 1, i-1
+           if ( idat(dihed%iimpro(1,i)) .eq.                         &
+                idat(dihed%iimpro(1,j)) ) then
              flag = .TRUE.
-!
-             vaux1(:) = dihed%iimpro(:,i)
-             vaux2(:) = iimpro(:,j)
-!
-             id1 = idat(vaux1(1))*nidat**3 + idat(vaux1(2))*nidat**2   &
-                   + idat(vaux1(3))*nidat + idat(vaux1(4))
-!
-             id2 = idat(vaux2(1))*nidat**3 + idat(vaux2(2))*nidat**2   &
-                   + idat(vaux2(3))*nidat + idat(vaux2(4))     
-!
-             if ( id1 .gt. id2 ) then
-               dihed%iimpro(:,i) = iimpro(:,nimpro)
-               dihed%dimpro(i)   = dimpro(nimpro)
-               dihed%fimpro(i)   = fimpro(nimpro) 
-             end if   
-!
              exit
            end if
          end do
-         if ( .not. flag ) then
+         if ( flag ) cycle
 !
+         representative_candidate = i
+         do j = i+1, nimpro_candidates
+           if ( idat(dihed%iimpro(1,j)) .eq.                         &
+                idat(dihed%iimpro(1,i)) ) then
+             call better_improper_candidate(idat,znum,                 &
+                  dihed%iimpro(:,j),primpro(j),refadequacy(j),         &
+                  refwiberg(j),dihed%iimpro(:,representative_candidate), &
+                  primpro(representative_candidate),                   &
+                  refadequacy(representative_candidate),               &
+                  refwiberg(representative_candidate),lfound)
+             if ( lfound ) then
+               representative_candidate = j
+             end if
+           end if
+         end do
+
+         target_improper_signature(:) =                            &
+              idat(dihed%iimpro(:,representative_candidate))
+
+! Select the matching signature for every physical center of this type.
+         do j = i, nimpro_candidates
+           if ( idat(dihed%iimpro(1,j)) .ne.                         &
+                idat(dihed%iimpro(1,i)) ) cycle
+
+           center_atom = dihed%iimpro(1,j)
+           flag = .FALSE.
+           do k = i, j-1
+             if ( (idat(dihed%iimpro(1,k)) .eq.                     &
+                   idat(dihed%iimpro(1,i))) .and.                   &
+                  (dihed%iimpro(1,k) .eq. center_atom) ) then
+               flag = .TRUE.
+               exit
+             end if
+           end do
+           if ( flag ) cycle
+
+           selected_candidate = 0
+           do k = 1, nimpro_candidates
+             if ( dihed%iimpro(1,k) .ne. center_atom ) cycle
+             if ( .not.all(idat(dihed%iimpro(:,k)) .eq.              &
+                            target_improper_signature(:)) ) cycle
+
+             if ( selected_candidate .eq. 0 ) then
+               selected_candidate = k
+             else
+               call better_improper_candidate(idat,znum,             &
+                    dihed%iimpro(:,k),primpro(k),refadequacy(k),     &
+                    refwiberg(k),dihed%iimpro(:,selected_candidate), &
+                    primpro(selected_candidate),                     &
+                    refadequacy(selected_candidate),                 &
+                    refwiberg(selected_candidate),lfound)
+               if ( lfound ) selected_candidate = k
+             end if
+           end do
+
+           if ( selected_candidate .eq. 0 ) then
+             write(*,'(A,I0,A,4(1X,I0))')                            &
+                  'ERROR in setdihe: no OOP candidate for center ',  &
+                  center_atom,' matches chemical signature',         &
+                  target_improper_signature(:)
+             stop 1
+           end if
+
            nimpro = nimpro + 1
-!
-           iimpro(:,nimpro) = dihed%iimpro(:,i) 
-           dimpro(nimpro)   = dihed%dimpro(i) 
-           fimpro(nimpro)   = dihed%fimpro(i) 
-!
-         end if
+           iimpro(:,nimpro) = dihed%iimpro(:,selected_candidate)
+           dimpro(nimpro)   = dihed%dimpro(selected_candidate)
+           fimpro(nimpro)   = dihed%fimpro(selected_candidate)
+           primpro(nimpro)  = primpro(selected_candidate)
+           refadequacy(nimpro) = refadequacy(selected_candidate)
+           refwiberg(nimpro) = refwiberg(selected_candidate)
+         end do
        end do
 !
        dihed%nimpro      = nimpro
@@ -1563,19 +1681,13 @@
            if ( dihed%iinv(1,i) .eq. iinv(1,j) ) then
              flag = .TRUE.
 !
-             vaux1(:) = dihed%iimpro(:,i)
-             vaux2(:) = iimpro(:,i)
+             call better_inversion_candidate(idat,znum,wiberg,        &
+                  dihed%iinv(:,i),iinv(:,j),lfound)
 !
-             id1 = idat(vaux1(1))*nidat**3 + idat(vaux1(2))*nidat**2   &
-                   + idat(vaux1(3))*nidat + idat(vaux1(4))
-!
-             id2 = idat(vaux2(1))*nidat**3 + idat(vaux2(2))*nidat**2   &
-                   + idat(vaux2(3))*nidat + idat(vaux2(4))     
-!
-             if ( id1 .gt. id2 ) then
-               dihed%iimpro(:,i) = iimpro(:,nimpro)
-               dihed%dimpro(i)   = dimpro(nimpro)
-               dihed%fimpro(i)   = fimpro(nimpro) 
+             if ( lfound ) then
+               iinv(:,j) = dihed%iinv(:,i)
+               dinv(j)   = dihed%dinv(i)
+               finv(j)   = dihed%finv(i)
              end if   
 !
              exit
@@ -1585,9 +1697,9 @@
 !
            ninv = ninv + 1
 !
-           iinv(:,nimpro) = dihed%iinv(:,i) 
-           dinv(nimpro)   = dihed%dinv(i) 
-           finv(nimpro)   = dihed%finv(i) 
+           iinv(:,ninv) = dihed%iinv(:,i) 
+           dinv(ninv)   = dihed%dinv(i) 
+           finv(ninv)   = dihed%finv(i) 
 !
          end if
        end do
@@ -1682,11 +1794,13 @@
 !
            daux = calc_angle(coord(:,vaux(1)),coord(:,vaux(2)),        &
                                                        coord(:,vaux(3)))
-           if ( abs(daux) .ge. 175.0d0 ) cycle
+           daux = daux*180.0d0/pi
+           if ( abs(daux) .ge. linear_angle_thr ) cycle
 !
            daux = calc_angle(coord(:,vaux(2)),coord(:,vaux(3)),        &
                                                        coord(:,vaux(4)))
-           if ( abs(daux) .ge. 175.0d0 ) cycle
+           daux = daux*180.0d0/pi
+           if ( abs(daux) .ge. linear_angle_thr ) cycle
 !
 ! Computing equilibrium value
 !
@@ -1734,7 +1848,8 @@
 ! Generating Fourier series for each flexible dihedral
 ! ----------------------------------------------------
 !
-       call genquad(nat,znum,dihed,ndihe,debug)
+       call genquad(nat,coord,adj,ideg,lcycle,lrigid,znum,dihed,ndihe, &
+                    debug)
 !
        call genmethlist(nat,adj,znum,dihed,dihed%ndihe,lch3,ich3,debug)
 !
@@ -1774,6 +1889,153 @@
 !
        return
        end subroutine setdihe
+!
+!======================================================================!
+!
+! The first two positions of an improper or inversion are an oriented
+! center--reference bond.  setdeps relies on this invariant to associate
+! aromatic rigid terms with the corresponding improper.
+!
+       subroutine canonicalize_improper_terminals(idat,iquad)
+!
+       implicit none
+!
+       integer,dimension(:),intent(in)       ::  idat
+       integer,dimension(4),intent(inout)    ::  iquad
+       integer                              ::  itmp
+!
+       if ( (idat(iquad(3)).gt.idat(iquad(4))) .or.                  &
+            ((idat(iquad(3)).eq.idat(iquad(4))).and.                &
+             (iquad(3).gt.iquad(4))) ) then
+         itmp = iquad(3)
+         iquad(3) = iquad(4)
+         iquad(4) = itmp
+       end if
+!
+       return
+       end subroutine canonicalize_improper_terminals
+!
+!======================================================================!
+!
+       subroutine better_improper_candidate(idat,znum,candidate,      &
+                    candidate_class,candidate_adequacy,candidate_wiberg, &
+                    selected,selected_class,selected_adequacy,       &
+                    selected_wiberg,better)
+!
+       implicit none
+!
+       integer,dimension(:),intent(in)       ::  idat,znum
+       integer,dimension(4),intent(in)        ::  candidate,selected
+       integer,intent(in)                     ::  candidate_class,selected_class
+       integer,intent(in)                     ::  candidate_adequacy,selected_adequacy
+       real(kind=8),intent(in)                ::  candidate_wiberg,selected_wiberg
+       logical,intent(out)                     ::  better
+!
+       better = .FALSE.
+       if ( candidate_class .ne. selected_class ) then
+         better = candidate_class .lt. selected_class
+       else if ( candidate_adequacy .ne. selected_adequacy ) then
+         better = candidate_adequacy .lt. selected_adequacy
+       else if ( abs(candidate_wiberg-selected_wiberg) .gt. 1.0d-12 ) then
+         better = candidate_wiberg .gt. selected_wiberg
+       else if ( (znum(candidate(2)).ne.1) .neqv.                     &
+                 (znum(selected(2)).ne.1) ) then
+         better = znum(candidate(2)) .ne. 1
+       else if ( reference_element_priority(znum(candidate(2))) .ne. &
+                 reference_element_priority(znum(selected(2))) ) then
+         better = reference_element_priority(znum(candidate(2))) .lt. &
+                  reference_element_priority(znum(selected(2)))
+       else
+         call canonical_signature_is_greater(idat,candidate,selected,better)
+       end if
+!
+       return
+       end subroutine better_improper_candidate
+!
+!======================================================================!
+!
+       subroutine better_inversion_candidate(idat,znum,wiberg,        &
+                                              candidate,selected,better)
+!
+       implicit none
+!
+       integer,dimension(:),intent(in)       ::  idat,znum
+       real(kind=8),dimension(:,:),intent(in) ::  wiberg
+       integer,dimension(4),intent(in)        ::  candidate,selected
+       logical,intent(out)                     ::  better
+!
+       better = .FALSE.
+! For an amine inversion, H is a fallback reference: choose the
+! strongest heavy-atom bond before considering any N--H candidate.
+       if ( (znum(candidate(2)).ne.1) .neqv.                          &
+                 (znum(selected(2)).ne.1) ) then
+         better = znum(candidate(2)) .ne. 1
+       else if ( abs(wiberg(candidate(1),candidate(2)) -              &
+                     wiberg(selected(1),selected(2))) .gt. 1.0d-12 ) then
+         better = wiberg(candidate(1),candidate(2)) .gt.              &
+                  wiberg(selected(1),selected(2))
+       else if ( reference_element_priority(znum(candidate(2))) .ne. &
+                 reference_element_priority(znum(selected(2))) ) then
+         better = reference_element_priority(znum(candidate(2))) .lt. &
+                  reference_element_priority(znum(selected(2)))
+       else
+         call canonical_signature_is_greater(idat,candidate,selected,better)
+       end if
+!
+       return
+       end subroutine better_inversion_candidate
+!
+!======================================================================!
+!
+       integer function reference_element_priority(atomic_number)
+!
+       implicit none
+!
+       integer,intent(in) :: atomic_number
+!
+       select case (atomic_number)
+       case (8)
+         reference_element_priority = 1
+       case (16)
+         reference_element_priority = 2
+       case (7)
+         reference_element_priority = 3
+       case (6)
+         reference_element_priority = 4
+       case default
+         reference_element_priority = 5
+       end select
+!
+       return
+       end function reference_element_priority
+!
+!======================================================================!
+!
+       subroutine canonical_signature_is_greater(idat,candidate,selected,greater)
+!
+       implicit none
+!
+       integer,dimension(:),intent(in)       ::  idat
+       integer,dimension(4),intent(in)        ::  candidate,selected
+       logical,intent(out)                     ::  greater
+       integer                                 ::  i
+!
+       greater = .FALSE.
+       do i = 1, 4
+         if ( idat(candidate(i)) .ne. idat(selected(i)) ) then
+           greater = idat(candidate(i)) .gt. idat(selected(i))
+           return
+         end if
+       end do
+       do i = 1, 4
+         if ( candidate(i) .ne. selected(i) ) then
+           greater = candidate(i) .gt. selected(i)
+           return
+         end if
+       end do
+!
+       return
+       end subroutine canonical_signature_is_greater
 !
 !======================================================================!
 !
@@ -2165,11 +2427,15 @@
 !
        character(len=50),dimension(ndihe)             ::  labdihe  !
        logical,dimension(ndihe)                       ::  lquad    !
+       logical,dimension(ndihe)                       ::  ldep     !
        integer,dimension(4,ndihe)                     ::  idihe    !
        integer,dimension(ndihe)                       ::  sdihe    !
        integer,dimension(ndihe)                       ::  mdihe    !
        integer,dimension(ndihe)                       ::  iddihe   !
+       integer,dimension(ndihe)                       ::  iflexterm!
+       integer,dimension(ndihe)                       ::  qterm    !
        integer,dimension(ndihe)                       ::  ivaux    !
+       integer                                        ::  idep     !
        integer                                        ::  niddihe  !
        integer                                        ::  nterm    !
        integer                                        ::  i,j,k    !
@@ -2188,6 +2454,7 @@
            mdihe(k)   = dihe%flexi(i)%tor(j)%multi
            idihe(:,k) = dihe%flexi(i)%itor(:)
            labdihe(k) = dihe%flexi(i)%tor(j)%labtor 
+           iflexterm(k) = i
 !
            ivaux(k) = dihe%idflexi(i)*10 + mdihe(k)
 !~ write(*,*) k,trim(labdihe(k)),dihe%idflexi(i),mdihe(k),ivaux(k)
@@ -2196,7 +2463,7 @@
        end do
        nterm = k
 !
-       call inormlabels(ndihe,ivaux,iddihe,niddihe)
+       call inormlabels(nterm,ivaux(:nterm),iddihe(:nterm),niddihe)
 !~        k = 0
 !~        do i = 1, dihe%nflexi
 !~          do j = 1, dihe%flexi(i)%ntor
@@ -2210,6 +2477,8 @@
 ! Finding position of principal quadruplets in the new list
 !
        lquad(:) = .FALSE.
+       ldep(:)  = .FALSE.
+       qterm(:) = 0
        do i = 1, dihe%nquad
          do j = 1, nterm
            if ( lquad(j) ) cycle
@@ -2218,9 +2487,32 @@
                  .and. (idihe(3,j).eq.dihe%iquad(3,i))                 &
                  .and. (idihe(4,j).eq.dihe%iquad(4,i)) ) then                 
              lquad(j) = .TRUE.
+             qterm(i) = j
            end if
          end do
        end do
+!
+! Printing explicit dependencies for extra ring-exocyclic quadruplets
+! selected by genquad but not used as independent scan coordinates.
+!
+       if ( allocated(dihe%depquad) ) then
+         do i = 1, nterm
+           idep = dihe%depquad(iflexterm(i))
+           if ( (idep.gt.0).and.(idep.le.dihe%nquad) ) then
+             if ( qterm(idep) .gt. 0 ) then
+               write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
+                                  sdihe(i),'=',sdihe(qterm(idep)),     &
+                                  '*1.d0 ; '//trim(labdihe(i))//' = '//&
+                                  trim(labdihe(qterm(idep)))
+               write(uniscr,'(3X,I4,1X,A,1X,I4,A)')                    &
+                                  sdihe(i),'=',sdihe(qterm(idep)),     &
+                                  '*1.d0 ; '//trim(labdihe(i))//' = '//&
+                                  trim(labdihe(qterm(idep)))
+               ldep(i) = .TRUE.
+             end if
+           end if
+         end do
+       end if
 !
 ! Printing equivalent dihedral terms with same identifier based on 
 !  atomtypes and multiplicities 
@@ -2229,6 +2521,7 @@
          if ( lquad(i) ) then
            do j = 1, nterm
              if ( lquad(j) ) cycle
+             if ( ldep(j) ) cycle
              if ( iddihe(i) .eq. iddihe(j) ) then
 !~ write(*,*) 'matching',i,iddihe(i),'with',j,iddihe(j)
                write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
@@ -2254,7 +2547,7 @@
        subroutine setdeps(nat,r,idat,ndihe,nrigid,irigid,idrigid,      &
                            drigid,srigid,labrigid,nimpro,iimpro,       & 
                            idimpro,dimpro,simpro,labimpro,marunit,     &
-                           narunit,arunit,adj,lheavy)
+                           narunit,arunit,adj,lheavy,fadhocdihedeps)
 !
        use printings
        use graphtools, only:  blockdiag,inormlabels
@@ -2284,6 +2577,7 @@
        integer,intent(in)                              ::  marunit   !    
        logical,dimension(nat,nat),intent(in)           ::  adj       !
        logical,dimension(nat),intent(in)               ::  lheavy    !
+       logical,intent(in)                              ::  fadhocdihedeps !
 !
 ! Equivalent atoms information
 !
@@ -2329,6 +2623,8 @@
 ! Finding equivalencies between improper and rigid dihedrals
 ! ..........................................................
 !
+! iimpro(1:2) is the deterministic center--reference bond selected in
+! setdihe.  The aromatic matching below intentionally uses that pair.
 ! Generating unique representation with rigid and improper dihedrals
 !
        do i = 1, nrigid
@@ -2372,6 +2668,8 @@
 ! Setting ad hoc dependencies
 ! ---------------------------
 !
+       if ( fadhocdihedeps ) then
+
        chkimpro(:) = .TRUE.
 !
        do i = 1, marunit
@@ -2510,6 +2808,11 @@
 ! Assign a type to the actual quadruplet
 ! --------------------------------------
 !
+           ! A generated aromatic quadruplet can be absent from the
+           ! rigid list after geometric filtering. It has no ad hoc
+           ! rigid/improper counterpart to classify in that case.
+           if ( idxdihe(j) .lt. 1 ) cycle
+
 !   i) backbone (equivalent to C-C-C-X and impropers)
 !  ii) interunit (C-C-C-C [trans], C-C-C-H [cis])
 ! iii) C-C-C-H [trans] (equivalent to impropers)
@@ -2625,6 +2928,7 @@
          end do
 !
        end do
+       end if
 !
 ! Block-diagonalization of the adjacency matrix yields an array repre-
 !  sentation with the equivalent bond terms information

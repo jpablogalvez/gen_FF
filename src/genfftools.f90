@@ -83,8 +83,8 @@
 !
 ! This subroutine 
 !
-       subroutine genrigidlist(nat,r,wiberg,coord,cycles,ncycle,       &
-                               mcycle,lcycle,lrigid,laroma,latar)   
+       subroutine genrigidlist(nat,r,wiberg,coord,znum,cycles,ncycle,  &
+                               mcycle,lcycle,lrigid,laroma,latar)
 !
        implicit none
 !
@@ -98,6 +98,7 @@
        logical,dimension(nat),intent(out)          ::  latar   !  Aromatic atom
        integer,dimension(r,nat),intent(in)         ::  cycles  !
        integer,dimension(r),intent(in)             ::  ncycle  !
+       integer,dimension(nat),intent(in)            ::  znum    !
        integer,intent(in)                          ::  nat     !  Number of nodes
        integer,intent(in)                          ::  r       !  Graph rank
        integer,intent(in)                          ::  mcycle  !  Number of cycles
@@ -105,12 +106,17 @@
 ! Local variables
 ! 
        real(kind=8)                                ::  daux    !
+       real(kind=8)                                ::  thr     !
        logical                                     ::  lcheck  !
        integer,dimension(4)                        ::  ivaux   !
        integer                                     ::  i,j,k   !
        integer                                     ::  ii      !
 !
-       real(kind=8),parameter                      ::  pi =  4*atan(1.0_8) 
+       real(kind=8),parameter                      ::  pi =  4*atan(1.0_8)
+       real(kind=8),parameter                      ::  thr_cc = 1.25d0
+       real(kind=8),parameter                      ::  thr_cn = 1.20d0
+       real(kind=8),parameter                      ::  thr_nn = 1.20d0
+       real(kind=8),parameter                      ::  thr_xx = 1.50d0
 
 !
 ! Generating adjacency matrix with rigid bonds information
@@ -123,7 +129,9 @@
 ! We consider rigid bond 
 !  if Wiberg index is greater than 1.1 and the bond belongs to a cycle
 !   then it belongs to an aromatic cycle
-!  if Wiberg index is greater than 1.5 then it is a double bond
+!  if Wiberg index is greater than an element-pair threshold then it is
+!   treated as a double/conjugated rigid bond. Lower thresholds for C-C,
+!   C-N and N-N catch partial double bonds such as amides.
 !
        do i = 1, nat-1
          do j = i+1, nat
@@ -137,9 +145,22 @@
 !
              latar(i) = .TRUE.
              latar(j) = .TRUE.
-           else if ( wiberg(j,i) .ge. 1.5d0 ) then
+           else
+             if ( (znum(i).eq.6).and.(znum(j).eq.6) ) then
+               thr = thr_cc
+             else if ( ((znum(i).eq.6).and.(znum(j).eq.7)) .or.       &
+                       ((znum(i).eq.7).and.(znum(j).eq.6)) ) then
+               thr = thr_cn
+             else if ( (znum(i).eq.7).and.(znum(j).eq.7) ) then
+               thr = thr_nn
+             else
+               thr = thr_xx
+             end if
+!
+             if ( wiberg(j,i) .ge. thr ) then
              lrigid(i,j) = .TRUE.
              lrigid(j,i) = .TRUE.
+             end if
            end if
 !
          end do
@@ -733,6 +754,8 @@
        integer,dimension(4,ndihe)         ::  itmp     !
        integer,dimension(ndihe)           ::  ftmp     !
        integer,dimension(ndihe)           ::  iddihe   !
+       integer,dimension(ndihe)           ::  qmap     !
+       integer,dimension(ndihe)           ::  stmp     !
        integer,dimension(4)               ::  vaux     !
        integer                            ::  ntmp     !
        integer                            ::  i,j,k    !
@@ -751,6 +774,8 @@
        itmp(:,:) = -1
        dtmp(:)   = 0.0d0
        ftmp(:)   = -1
+       qmap(:)   = 0
+       stmp(:)   = 0
        ntmp      = 0
 !
        k = 0
@@ -763,12 +788,16 @@
          itmp(:,k) = dihe%iquad(:,i)
          dtmp(k)   = dihe%dquad(i)
          ftmp(k)   = dihe%fquad(i)
+         stmp(k)   = dihe%squad(i)
+         qmap(i)   = k
          ntmp = k      
 !
          do j = i+1, dihe%nquad
            if ( visited(j) ) cycle
            if ( iddihe(i) .eq. iddihe(j) ) then
+             if ( (dihe%squad(i).eq.1).and.(dihe%squad(j).eq.1) ) cycle
              visited(j) = .TRUE.
+             qmap(j) = k
              exit
            end if
          end do
@@ -777,6 +806,18 @@
        dihe%iquad(:,:) = itmp(:,:)
        dihe%dquad(:)   = dtmp(:)
        dihe%fquad(:)   = ftmp(:)
+       dihe%squad(:)   = stmp(:)
+       if ( allocated(dihe%depquad) ) then
+         do i = 1, dihe%nflexi
+           if ( dihe%depquad(i) .gt. 0 ) then
+             if ( qmap(dihe%depquad(i)) .gt. 0 ) then
+               dihe%depquad(i) = qmap(dihe%depquad(i))
+             else
+               dihe%depquad(i) = 0
+             end if
+           end if
+         end do
+       end if
        dihe%nquad = ntmp  
 !
        if ( debug ) then
@@ -820,6 +861,7 @@
        type(dihedrals)                         ::  tmpdihe  !
        integer,dimension(4)                    ::  ivaux1   !
        integer,dimension(4)                    ::  ivaux2   !
+       logical                                 ::  ldep     !
        integer                                 ::  i,j,k    !
 ! 
 !  Including only principal quadruplets 
@@ -829,16 +871,19 @@
 !
        allocate(tmpdihe%iflexi(4,ndihe),tmpdihe%dflexi(ndihe),         &
                 tmpdihe%kflexi(ndihe),tmpdihe%fflexi(ndihe),           &
-                tmpdihe%flexi(ndihe))
+                tmpdihe%flexi(ndihe),tmpdihe%depquad(ndihe))
 !
        tmpdihe%iflexi(:,:) = -1
        tmpdihe%dflexi(:)   = 999.0d0
        tmpdihe%kflexi(:)   = 0.0d0
        tmpdihe%fflexi(:)   = -1
+       tmpdihe%depquad(:)  = 0
 !
        k = 0
        do i = 1, dihe%nflexi
          ivaux1(:) = dihe%iflexi(:,i)
+         ldep = allocated(dihe%depquad)
+         if ( ldep ) ldep = dihe%depquad(i) .gt. 0
          if ( lch3(i) ) then
 !
 write(*,*) 'Dihedral',i,'is a CH3 rotation',dihe%iflexi(:,i)
@@ -859,6 +904,8 @@ write(*,*)
                tmpdihe%dflexi(k)   = dihe%dflexi(i)
                tmpdihe%kflexi(k)   = dihe%kflexi(i)
                tmpdihe%fflexi(k)   = dihe%fflexi(i)
+               if ( allocated(dihe%depquad) )                          &
+                 tmpdihe%depquad(k) = dihe%depquad(i)
 !
                tmpdihe%flexi(k)%ntor = dihe%flexi(i)%ntor
                allocate(tmpdihe%flexi(k)%tor(tmpdihe%flexi(k)%ntor))
@@ -873,6 +920,26 @@ write(*,*)
 !
          else
 !
+           if ( ldep ) then
+!
+             k = k + 1
+!
+             tmpdihe%iflexi(:,k) = dihe%iflexi(:,i)
+             tmpdihe%dflexi(k)   = dihe%dflexi(i)
+             tmpdihe%kflexi(k)   = dihe%kflexi(i)
+             tmpdihe%fflexi(k)   = dihe%fflexi(i)
+             tmpdihe%depquad(k)  = dihe%depquad(i)
+!
+             tmpdihe%flexi(k)%ntor = dihe%flexi(i)%ntor
+             allocate(tmpdihe%flexi(k)%tor(tmpdihe%flexi(k)%ntor))
+!
+             tmpdihe%flexi(k)%itor(:) = dihe%flexi(i)%itor(:)
+             tmpdihe%flexi(k)%tor     = dihe%flexi(i)%tor
+!
+             cycle
+!
+           end if
+!
            do j = 1, dihe%nquad
              ivaux2(:) = dihe%iquad(:,j)
              if ( ((ivaux1(1).eq.ivaux2(1)).and.                       &
@@ -886,6 +953,8 @@ write(*,*)
                tmpdihe%dflexi(k)   = dihe%dflexi(i)
                tmpdihe%kflexi(k)   = dihe%kflexi(i)
                tmpdihe%fflexi(k)   = dihe%fflexi(i)
+               if ( allocated(dihe%depquad) )                          &
+                 tmpdihe%depquad(k) = dihe%depquad(i)
 !
                tmpdihe%flexi(k)%ntor = dihe%flexi(i)%ntor
                allocate(tmpdihe%flexi(k)%tor(tmpdihe%flexi(k)%ntor))
@@ -919,6 +988,7 @@ write(*,*)
        dihe%dflexi(:)   = tmpdihe%dflexi(:)
        dihe%kflexi(:)   = tmpdihe%kflexi(:)
        dihe%fflexi(:)   = tmpdihe%fflexi(:)
+       if ( allocated(dihe%depquad) ) dihe%depquad(:) = tmpdihe%depquad(:)
 !
        return
        end subroutine screenquad
@@ -929,7 +999,8 @@ write(*,*)
 !
 ! This subroutine 
 !
-       subroutine genquad(nat,znum,dihed,ndihe,debug)
+       subroutine genquad(nat,coord,adj,ideg,lcycle,lrigid,znum,dihed, &
+                          ndihe,debug)
 !
        use datatypes,  only:  dihedrals
 !
@@ -937,27 +1008,39 @@ write(*,*)
 !
 ! Input/output variables
 !
-       type(dihedrals),intent(inout)      ::  dihed    !
-       integer,dimension(nat),intent(in)  ::  znum     !
-       integer,intent(in)                 ::  nat      !
-       integer,intent(in)                 ::  ndihe    !
-       logical,intent(in)                 ::  debug    !
+       type(dihedrals),intent(inout)             ::  dihed    !
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord    !
+       logical,dimension(nat,nat),intent(in)     ::  adj      !
+       logical,dimension(nat,nat),intent(in)     ::  lcycle   !
+       logical,dimension(nat,nat),intent(in)     ::  lrigid   !
+       integer,dimension(nat),intent(in)         ::  ideg     !
+       integer,dimension(nat),intent(in)         ::  znum     !
+       integer,intent(in)                        ::  nat      !
+       integer,intent(in)                        ::  ndihe    !
+       logical,intent(in)                        ::  debug    !
 !
 ! Local variables
 !
-       type(dihedrals)                    ::  tmpdi    !            
-       real(kind=8)                       ::  daux
-       logical,dimension(ndihe)           ::  visited  !
-       logical                            ::  flag     !
-       integer,dimension(ndihe)           ::  imap     !  
-       integer,dimension(ndihe)           ::  iflexi   !  
-       integer,dimension(ndihe)           ::  neqquad  !  
-       integer,dimension(4)               ::  vaux     !  
-       integer,dimension(4)               ::  vaux1    !  
-       integer,dimension(4)               ::  vaux2    !  
-       integer                            ::  meqquad  !  
-       integer                            ::  nmap     !
-       integer                            ::  i,j,k    !
+       type(dihedrals)                    ::  tmpdi     !
+       logical,dimension(ndihe)           ::  visited   !
+       logical                            ::  flag      !
+       integer,dimension(ndihe)           ::  imap      !
+       integer,dimension(ndihe)           ::  iadd      !
+       integer,dimension(ndihe)           ::  iflexi    !
+       integer,dimension(ndihe)           ::  iselect   !
+       integer,dimension(ndihe)           ::  sselect   !
+       integer,dimension(ndihe)           ::  tmpmap    !
+       integer,dimension(ndihe)           ::  neqquad   !
+       integer,dimension(4)               ::  vaux      !
+       integer,dimension(4)               ::  vaux1     !
+       integer,dimension(4)               ::  vaux2     !
+       integer                            ::  meqquad   !
+       integer                            ::  nmap      !
+       integer                            ::  nadd      !
+       integer                            ::  nselect   !
+       integer                            ::  i,j,k     !
+!
+       real(kind=8)                       ::  daux      !
 !
 !  Generating principal quadruplets 
 ! ---------------------------------
@@ -983,6 +1066,7 @@ write(*,*)
          tmpdi%iflexi(:,k) = dihed%iflexi(:,i)
          tmpdi%fflexi(k)   = dihed%fflexi(i)
          tmpdi%dflexi(k)   = dihed%dflexi(i)
+         tmpmap(k)         = i
 !
          vaux1(:) = dihed%iflexi(:,i)
          visited(i) = .TRUE.
@@ -999,13 +1083,22 @@ write(*,*)
              k = k + 1
              tmpdi%iflexi(:,k) = dihed%iflexi(:,j)
              tmpdi%fflexi(k)   = dihed%fflexi(j)
-             tmpdi%dflexi(k)   = dihed%dflexi(j)             
+             tmpdi%dflexi(k)   = dihed%dflexi(j)
+             tmpmap(k)         = j
            end if
 ! 
          end do
        end do
 !
        imap(:) = -1
+       iflexi(:)  = -1
+       iselect(:) = -1
+       sselect(:) = 0
+       nselect = 0
+!
+       if ( allocated(dihed%depquad) ) deallocate(dihed%depquad)
+       allocate(dihed%depquad(ndihe))
+       dihed%depquad(:) = 0
 !
        k = 0
        do i = 1, meqquad
@@ -1045,83 +1138,94 @@ write(*,*)
            end do  
          end if
 !
+! Select multiple ring-exocyclic quadruplets when the exocyclic atom is
+! geometrically compatible with the requested cis/cis-trans cases.
+!
+         call select_ring_exocyclic(nat,coord,adj,ideg,lcycle,lrigid, &
+                                    tmpdi,k,neqquad(i),ndihe,imap,    &
+                                    nmap,iadd,nadd)
+!
+         if ( nadd .gt. 0 ) then
+           nselect = nselect + 1
+!
+           iselect(nselect) = imap(1)
+!
+           do j = 1, nmap
+             daux = abs(tmpdi%dflexi(imap(j)))
+             if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
+               iselect(nselect) = imap(j)
+               GOTO 1000
+             end if
+           end do
+!
+           do j = 1, nmap
+             daux = abs(tmpdi%dflexi(imap(j)))
+             if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
+               iselect(nselect) = imap(j)
+               GOTO 1000
+             end if
+           end do
+!
+           do j = 1, nmap
+             daux = abs(tmpdi%dflexi(imap(j)))
+             if ( (daux.ge.70.0d0) .and. (daux.le.105.0d0) ) then
+               iselect(nselect) = imap(j)
+               GOTO 1000
+             end if
+           end do
+!
+           do j = 1, nmap
+             daux = abs(tmpdi%dflexi(imap(j)))
+             if ( (daux.ge.35.0d0) .and. (daux.le.70.0d0) ) then
+               iselect(nselect) = imap(j)
+               GOTO 1000
+             end if
+           end do
+!
+           do j = 1, nmap
+             daux = abs(tmpdi%dflexi(imap(j)))
+             if ( (daux.ge.105.0d0) .and. (daux.le.150.0d0) ) then
+               iselect(nselect) = imap(j)
+               GOTO 1000
+             end if
+           end do
+!
+1000       continue
+!
+           sselect(nselect) = 0
+           do j = 1, nadd
+             if ( iadd(j) .ne. iselect(nselect) ) then
+               dihed%depquad(tmpmap(iadd(j))) = nselect
+             end if
+           end do
+           k = k + neqquad(i)
+           cycle
+         end if
+!
 ! Find leading quadruplet
 !
-         flag = .FALSE.
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.70.0d0) .and. (daux.le.105.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.35.0d0) .and. (daux.le.70.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
-!
-         do j = 1, nmap
-           daux = abs(tmpdi%dflexi(imap(j)))
-           if ( (daux.ge.105.0d0) .and. (daux.le.150.0d0) ) then
-             flag = .TRUE.
-             iflexi(i) = imap(j)
-             k = k + neqquad(i)
-             exit
-           end if
-         end do
-         if ( flag ) cycle
+         iflexi(i) = leading_quad(tmpdi,imap,nmap,ndihe)
+         nselect = nselect + 1
+         iselect(nselect) = iflexi(i)
+         sselect(nselect) = 0
 !
          k = k + neqquad(i)
-!
-         neqquad(i) = nmap
 !
        end do
 !
 ! Storing information of selected quadruplets
 !
-       dihed%nquad = meqquad
-       allocate(dihed%iquad(4,meqquad),dihed%dquad(meqquad),           &
-                dihed%fquad(meqquad),dihed%mapquad(meqquad))
+       dihed%nquad = nselect
+       allocate(dihed%iquad(4,nselect),dihed%dquad(nselect),           &
+                dihed%fquad(nselect),dihed%mapquad(nselect),           &
+                dihed%squad(nselect))
 !
-       do i = 1, meqquad
-         dihed%iquad(:,i) = tmpdi%iflexi(:,iflexi(i))
-         dihed%dquad(i)   = tmpdi%dflexi(iflexi(i))
-         dihed%fquad(i)   = tmpdi%fflexi(iflexi(i))
-         dihed%mapquad(i) = iflexi(i)
+       do i = 1, nselect
+         dihed%iquad(:,i) = tmpdi%iflexi(:,iselect(i))
+         dihed%dquad(i)   = tmpdi%dflexi(iselect(i))
+         dihed%fquad(i)   = tmpdi%fflexi(iselect(i))
+         dihed%mapquad(i) = iselect(i)
+         dihed%squad(i)   = sselect(i)
        end do
 !
        if ( debug ) then
@@ -1134,7 +1238,383 @@ write(*,*)
        end if
 !
        return
+!
        end subroutine genquad
+!
+!======================================================================!
+!
+       subroutine select_ring_exocyclic(nat,coord,adj,ideg,lcycle,    &
+                                        lrigid,tmpdi,first,nitem,ndihe,&
+                                        imap,nmap,iout,nout)
+
+       use datatypes, only: dihedrals
+!
+       implicit none
+!
+       type(dihedrals),intent(in)             ::  tmpdi   !
+       real(kind=8),dimension(3,nat),intent(in) ::  coord !
+       logical,dimension(nat,nat),intent(in)  ::  adj     !
+       logical,dimension(nat,nat),intent(in)  ::  lcycle  !
+       logical,dimension(nat,nat),intent(in)  ::  lrigid  !
+       integer,dimension(nat),intent(in)      ::  ideg    !
+       integer,intent(in)                    ::  nat    !
+       integer,intent(in)                    ::  ndihe  !
+       integer,dimension(ndihe),intent(in)   ::  imap   !
+       integer,dimension(ndihe),intent(out)  ::  iout   !
+       integer,intent(in)                    ::  first  !
+       integer,intent(in)                    ::  nitem  !
+       integer,intent(in)                    ::  nmap   !
+       integer,intent(out)                   ::  nout   !
+!
+       real(kind=8)                          ::  daux   !
+       logical                               ::  ring1  !
+       logical                               ::  ring2  !
+       integer                               ::  c1     !
+       integer                               ::  c2     !
+       integer                               ::  exo    !
+       integer                               ::  ring   !
+       integer                               ::  ncis   !
+       integer                               ::  ntrans !
+       integer                               ::  j      !
+!
+       iout(:) = -1
+       nout = 0
+!
+       if ( nmap .le. 1 ) return
+!
+       c1 = tmpdi%iflexi(2,first+1)
+       c2 = tmpdi%iflexi(3,first+1)
+!
+       ring1 = has_ring_terminal(tmpdi,lcycle,c1,c2,first,nitem)
+       ring2 = has_ring_terminal(tmpdi,lcycle,c2,c1,first,nitem)
+!
+       if ( ring1 .eqv. ring2 ) return
+!
+       if ( ring1 ) then
+         ring = c1
+         exo  = c2
+       else
+         ring = c2
+         exo  = c1
+       end if
+!
+       if ( is_sp2_like_exocyclic(nat,coord,adj,ideg,lrigid,exo,ring) ) then
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
+             nout = nout + 1
+             iout(nout) = imap(j)
+           end if
+         end do
+         if ( nout .eq. 2 ) return
+         nout = 0
+       end if
+!
+       if ( is_valid_degree2_exocyclic(nat,coord,adj,ideg,lrigid,exo,ring) ) then
+         ncis   = 0
+         ntrans = 0
+         do j = 1, nmap
+           daux = abs(tmpdi%dflexi(imap(j)))
+           if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
+             ncis = ncis + 1
+           else if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
+             ntrans = ntrans + 1
+           end if
+           nout = nout + 1
+           iout(nout) = imap(j)
+         end do
+         if ( (nout.eq.2).and.(ncis.eq.1).and.(ntrans.eq.1) ) return
+         nout = 0
+       end if
+!
+       return
+       end subroutine select_ring_exocyclic
+!
+!======================================================================!
+!
+       logical function has_ring_terminal(tmpdi,lcycle,center,other,  &
+                                          first,nitem)
+
+       use datatypes, only: dihedrals
+!
+       implicit none
+!
+       type(dihedrals),intent(in)          ::  tmpdi   !
+       logical,dimension(:,:),intent(in)   ::  lcycle  !
+       integer,intent(in)          ::  center  !
+       integer,intent(in)          ::  other   !
+       integer,intent(in)          ::  first   !
+       integer,intent(in)          ::  nitem   !
+!
+       logical                     ::  match   !
+       integer,dimension(4)        ::  iquad   !
+       integer                     ::  tcenter !
+       integer                     ::  tother  !
+       integer                     ::  j       !
+!
+       has_ring_terminal = .FALSE.
+!
+       do j = 1, nitem
+         iquad(:) = tmpdi%iflexi(:,first+j)
+         call get_terminals(iquad,center,other,tcenter,tother,match)
+         if ( match .and. lcycle(center,tcenter) ) then
+           has_ring_terminal = .TRUE.
+           return
+         end if
+       end do
+!
+       return
+       end function has_ring_terminal
+!
+!======================================================================!
+!
+       subroutine get_terminals(iquad,center,other,tcenter,tother,match)
+!
+       implicit none
+!
+       logical,intent(out)               ::  match   !
+       integer,dimension(4),intent(in)   ::  iquad   !
+       integer,intent(in)                ::  center  !
+       integer,intent(in)                ::  other   !
+       integer,intent(out)               ::  tcenter !
+       integer,intent(out)               ::  tother  !
+!
+       match = .FALSE.
+       tcenter = -1
+       tother  = -1
+!
+       if ( (iquad(2).eq.center).and.(iquad(3).eq.other) ) then
+         tcenter = iquad(1)
+         tother  = iquad(4)
+         match = .TRUE.
+       else if ( (iquad(3).eq.center).and.(iquad(2).eq.other) ) then
+         tcenter = iquad(4)
+         tother  = iquad(1)
+         match = .TRUE.
+       end if
+!
+       return
+       end subroutine get_terminals
+!
+!======================================================================!
+!
+       logical function is_sp2_like_exocyclic(nat,coord,adj,ideg,     &
+                                               lrigid,exo,ring)
+!
+       implicit none
+!
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord   !
+       logical,dimension(nat,nat),intent(in)     ::  adj     !
+       logical,dimension(nat,nat),intent(in)     ::  lrigid  !
+       integer,dimension(nat),intent(in)         ::  ideg    !
+       integer,intent(in)                        ::  nat     !
+       integer,intent(in)               ::  exo   !
+       integer,intent(in)               ::  ring  !
+!
+       is_sp2_like_exocyclic = .FALSE.
+!
+       if ( ideg(exo) .ne. 3 ) return
+!
+       is_sp2_like_exocyclic = is_planar_degree3(nat,coord,adj,exo)   &
+                               .or. has_rigid_exo_bond(nat,adj,lrigid, &
+                                                       exo,ring)
+!
+       return
+       end function is_sp2_like_exocyclic
+!
+!======================================================================!
+!
+       logical function is_planar_degree3(nat,coord,adj,idx)
+!
+       implicit none
+!
+       real(kind=8),dimension(3,nat),intent(in) ::  coord  !
+       logical,dimension(nat,nat),intent(in)    ::  adj    !
+       integer,intent(in)                       ::  nat    !
+       integer,intent(in)                 ::  idx    !
+!
+       real(kind=8),dimension(3)          ::  angle  !
+       real(kind=8)                       ::  asum   !
+       integer,dimension(3)               ::  nei    !
+       integer                            ::  n      !
+       integer                            ::  j      !
+!
+       real(kind=8),parameter             ::  pi = 4*atan(1.0_8)
+!
+       is_planar_degree3 = .FALSE.
+!
+       n = 0
+       do j = 1, nat
+         if ( adj(idx,j) ) then
+           n = n + 1
+           if ( n .le. 3 ) nei(n) = j
+         end if
+       end do
+!
+       if ( n .ne. 3 ) return
+!
+       angle(1) = calc_angle(coord(:,nei(1)),coord(:,idx),coord(:,nei(2))) &
+                  * 180.0d0 / pi
+       angle(2) = calc_angle(coord(:,nei(1)),coord(:,idx),coord(:,nei(3))) &
+                  * 180.0d0 / pi
+       angle(3) = calc_angle(coord(:,nei(2)),coord(:,idx),coord(:,nei(3))) &
+                  * 180.0d0 / pi
+!
+       asum = angle(1) + angle(2) + angle(3)
+!
+       is_planar_degree3 = (abs(asum-360.0d0).le.25.0d0)               &
+                          .and. (maxval(angle).lt.170.0d0)
+!
+       return
+       end function is_planar_degree3
+!
+!======================================================================!
+!
+       logical function has_rigid_exo_bond(nat,adj,lrigid,exo,ring)
+!
+       implicit none
+!
+       logical,dimension(nat,nat),intent(in) ::  adj     !
+       logical,dimension(nat,nat),intent(in) ::  lrigid  !
+       integer,intent(in)                    ::  nat     !
+       integer,intent(in)        ::  exo   !
+       integer,intent(in)        ::  ring  !
+       integer                   ::  j     !
+!
+       has_rigid_exo_bond = .FALSE.
+!
+       do j = 1, nat
+         if ( j .eq. ring ) cycle
+         if ( adj(exo,j) .and. lrigid(exo,j) ) then
+           has_rigid_exo_bond = .TRUE.
+           return
+         end if
+       end do
+!
+       return
+       end function has_rigid_exo_bond
+!
+!======================================================================!
+!
+       logical function is_valid_degree2_exocyclic(nat,coord,adj,ideg,&
+                                                    lrigid,exo,ring)
+!
+       implicit none
+!
+       real(kind=8),dimension(3,nat),intent(in) ::  coord   !
+       logical,dimension(nat,nat),intent(in)    ::  adj     !
+       logical,dimension(nat,nat),intent(in)    ::  lrigid  !
+       integer,dimension(nat),intent(in)        ::  ideg    !
+       integer,intent(in)                       ::  nat     !
+       integer,intent(in)             ::  exo    !
+       integer,intent(in)             ::  ring   !
+!
+       real(kind=8)                   ::  angle  !
+       integer                        ::  other  !
+!
+       real(kind=8),parameter         ::  pi = 4*atan(1.0_8)
+!
+       is_valid_degree2_exocyclic = .FALSE.
+!
+       if ( ideg(exo) .ne. 2 ) return
+!
+       other = other_exocyclic_neighbor(nat,adj,exo,ring)
+       if ( other .lt. 1 ) return
+!
+       angle = calc_angle(coord(:,ring),coord(:,exo),coord(:,other))    &
+               * 180.0d0 / pi
+!
+       is_valid_degree2_exocyclic = lrigid(exo,other)                  &
+                                    .or. (angle.ge.160.0d0)
+!
+       return
+       end function is_valid_degree2_exocyclic
+!
+!======================================================================!
+!
+       integer function other_exocyclic_neighbor(nat,adj,exo,ring)
+!
+       implicit none
+!
+       logical,dimension(nat,nat),intent(in) ::  adj    !
+       integer,intent(in)                    ::  nat    !
+       integer,intent(in)        ::  exo   !
+       integer,intent(in)        ::  ring  !
+       integer                   ::  j     !
+!
+       other_exocyclic_neighbor = -1
+!
+       do j = 1, nat
+         if ( j .eq. ring ) cycle
+         if ( adj(exo,j) ) then
+           other_exocyclic_neighbor = j
+           return
+         end if
+       end do
+!
+       return
+       end function other_exocyclic_neighbor
+!
+!======================================================================!
+!
+       integer function leading_quad(tmpdi,imap,nmap,ndihe)
+
+       use datatypes, only: dihedrals
+
+       implicit none
+
+       type(dihedrals),intent(in)           ::  tmpdi  !
+       integer,intent(in)                   ::  nmap   !
+       integer,intent(in)                   ::  ndihe  !
+       integer,dimension(ndihe),intent(in)  ::  imap   !
+
+       real(kind=8)                         ::  daux   !
+       integer                              ::  j      !
+
+       leading_quad = imap(1)
+
+       do j = 1, nmap
+         daux = abs(tmpdi%dflexi(imap(j)))
+         if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
+           leading_quad = imap(j)
+           return
+         end if
+       end do
+
+       do j = 1, nmap
+         daux = abs(tmpdi%dflexi(imap(j)))
+         if ( (daux.gt.150.0d0) .and. (daux.lt.181.0d0) ) then
+           leading_quad = imap(j)
+           return
+         end if
+       end do
+
+       do j = 1, nmap
+         daux = abs(tmpdi%dflexi(imap(j)))
+         if ( (daux.ge.70.0d0) .and. (daux.le.105.0d0) ) then
+           leading_quad = imap(j)
+           return
+         end if
+       end do
+
+       do j = 1, nmap
+         daux = abs(tmpdi%dflexi(imap(j)))
+         if ( (daux.ge.35.0d0) .and. (daux.le.70.0d0) ) then
+           leading_quad = imap(j)
+           return
+         end if
+       end do
+
+       do j = 1, nmap
+         daux = abs(tmpdi%dflexi(imap(j)))
+         if ( (daux.ge.105.0d0) .and. (daux.le.150.0d0) ) then
+           leading_quad = imap(j)
+           return
+         end if
+       end do
+
+       return
+       end function leading_quad
 !
 !======================================================================!
 !

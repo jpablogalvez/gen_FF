@@ -37,6 +37,8 @@
        logical                                         ::  fring    !  
        logical                                         ::  fhetero  !  
        logical                                         ::  fdouble  !  
+       logical                                         ::  fnitrogen !  
+       logical                                         ::  fadhocdihedeps !
        logical                                         ::  fquad    !
        logical                                         ::  fsymm    !
        logical                                         ::  fpairs   !
@@ -53,6 +55,7 @@
        character(len=lentag)                           ::  topext   !
        character(len=lentag)                           ::  formt    !  QC  output format
        logical                                         ::  fqmout   !
+       logical                                         ::  fqmdir   !
        logical                                         ::  fqmscan  !
        logical                                         ::  fstep2   !
 !
@@ -150,7 +153,45 @@
        call command_line(inp,ref,intop,topout,qmout,qmdir,knei,        &
                          iroute,formt,meth,basis,disp,chrg,mult,step,  &
                          nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
-                         fpairs,fexcl,fquad,fring,fhetero,fdouble,debug)
+                         fpairs,fexcl,fquad,fring,fhetero,fdouble,      &
+                         fnitrogen,fadhocdihedeps,debug)
+!
+! Checking qmdir definition
+!
+       if ( len_trim(qmdir) .eq. 0 ) qmdir = '../QMData'
+!
+! Check whether qmout includes a directory path
+!
+       io = scan(qmout,'/',back=.TRUE.)
+       if ( (len_trim(qmout) .gt. 0) .and.                             &
+            (io .gt. 0) .and.                                          &
+            (io .lt. len_trim(qmout)) ) then
+         qmdir = qmout(:io)
+         qmout = qmout(io+1:)
+       end if
+!
+       io = len_trim(qmdir)
+       if ( qmdir(io:io) .ne. '/' ) qmdir = trim(qmdir)//'/'
+!
+! Create qmdir if necessary
+       inquire(file=trim(qmdir),exist=fqmdir)
+!
+       if ( .not. fqmdir  ) then
+!
+         call execute_command_line('mkdir -p '//trim(qmdir),wait=.TRUE., &
+                                   exitstat=io)
+!
+         if ( io .ne. 0 ) then
+           write(*,*)
+           write(*,'(2X,68("="))')
+           write(*,'(3X,A)') 'ERROR:  Could not create QM data directory'
+           write(*,*)
+           write(*,'(3X,A)') 'Directory : '//trim(qmdir)
+           write(*,'(2X,68("="))')
+           write(*,*)
+           call print_end()
+         end if
+       end if
 !
 ! Defaults
 !
@@ -293,7 +334,8 @@
 !
 ! Generating QC input
 !
-         call geninp(nat,lab,coord,bas,formt,meth,basis,disp,chrg,mult)
+         call geninp(nat,lab,coord,bas,qmdir,formt,meth,basis,disp,    &
+                     chrg,mult)
          GO TO 1000
 !
        end if
@@ -464,7 +506,7 @@
 !
 !  Generating rigidlist with rigid bonds
 !
-         call genrigidlist(nat,rank,wiberg,coord,cycles,ncycle,        &
+         call genrigidlist(nat,rank,wiberg,coord,znum,cycles,ncycle,   &
                            mcycle,lcycle,lrigid,laroma,latar) 
 !
 ! Generating representation of aromatic cycles
@@ -654,9 +696,9 @@
 !
        if ( fqmout ) then
 !
-         call genffbonded(nat,idat,nidat,coord,adj,ideg,lcycle,lrigid, &
-                          lch3,ich3,znum,top%bonded,dihe,iroute,fring, &
-                          fhetero,fdouble,debug)
+         call genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,lcycle,lrigid, &
+                          laroma,latar,lch3,ich3,znum,top%bonded,dihe, &
+                          iroute,fring,fhetero,fdouble,fnitrogen,debug)
 !
        else
 !
@@ -689,7 +731,8 @@
 !
 ! Finding principal quadruplets
 !
-         call genquad(nat,znum,dihe,dihe%ndihe,debug)
+         call genquad(nat,coord,adj,ideg,lcycle,lrigid,znum,dihe,      &
+                      dihe%ndihe,debug)
 !
 ! Finding quadruplets associated to CH3 rotations
 !
@@ -739,7 +782,8 @@
        write(unideps,'(A)') '$dependence 1.2'
 !
        call symffbonded(nat,nidat,idat,newlab,top%bonded,dihe,rank,    &
-                        marunit,narunit,arunit,lheavy,adj,fsymm,debug)
+                        marunit,narunit,arunit,lheavy,adj,fsymm,       &
+                        fadhocdihedeps,debug)
                         
 !
        write(unideps,'(A)') '$end'
@@ -765,6 +809,15 @@
        if ( (dihe%nflexi.gt.0) .and. fstep2 ) then
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
                           fsymm,intop,top%bonded,dihe,nstep)
+       else if ( dihe%nflexi.gt.0 ) then
+         write(*,*)
+         write(*,'(2X,68("*"))')
+         write(*,'(3X,A)') 'NOTE:  Joyce step 2 input was not generated'
+         write(*,*)
+         write(*,'(3X,A)') 'All scan Gaussian outputs must be present in '// &
+                           trim(qmdir)
+         write(*,'(2X,68("*"))')
+         write(*,*)
        end if
 !
 ! Printing summary of the input information
@@ -948,7 +1001,8 @@
                                iroute,formt,meth,basis,disp,chrg,mult, & 
                                step,nstep,sysname,resname,nmol,fsig,   &
                                feps,fsymm,fpairs,fexcl,fquad,fring,    &
-                               fhetero,fdouble,debug)
+                               fhetero,fdouble,fnitrogen,fadhocdihedeps,&
+                               debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -981,6 +1035,8 @@
        logical,intent(out)                ::  fring    !  
        logical,intent(out)                ::  fhetero  !  
        logical,intent(out)                ::  fdouble  !  
+       logical,intent(out)                ::  fnitrogen !  
+       logical,intent(out)                ::  fadhocdihedeps !
 !
        character(len=20),intent(out)      ::  meth     !
        character(len=20),intent(out)      ::  basis    !
@@ -1017,13 +1073,15 @@
        fring   = .TRUE.
        fhetero = .TRUE.
        fdouble = .TRUE.
+       fnitrogen = .FALSE.
+       fadhocdihedeps = .TRUE.
 !
        formt  = 'g16'
        step  = 15.0
        nstep = 23
 !
        qmout  = ''
-       qmdir  = '../QMdata/'
+       qmdir  = '../QMData/'
 !
        meth  = 'PBEPBE'
        basis = '6-31+G(D)'
@@ -1205,6 +1263,19 @@
            case ('-nooop-double','--nooop-double','--nostar-double')
              fdouble = .FALSE.
 !
+           case ('-oop-nitrogen','--oop-nitrogen','--star-nitrogen')
+             fnitrogen = .TRUE.
+!
+           case ('-nooop-nitrogen','--nooop-nitrogen',                &
+                 '--nostar-nitrogen')
+             fnitrogen = .FALSE.
+!
+           case ('-adhoc-dihedral-deps','--adhoc-dihedral-deps')
+             fadhocdihedeps = .TRUE.
+!
+           case ('-noadhoc-dihedral-deps','--noadhoc-dihedral-deps')
+             fadhocdihedeps = .FALSE.
+!
            case ('-pquad','-principal-quad','--principal-quad',        &
                                 '--principal-quadruplets','--principal')
              fquad = .TRUE.
@@ -1305,6 +1376,10 @@
                                       'ke dieds. in ketone, imine, etc.'
        write(*,'(2X,A)') '--[no]star-double            Add star li'//  &
                                          'ke dieds. in C=C double bonds'
+       write(*,'(2X,A)') '--[no]star-nitrogen          Add star li'//  &
+                                     'ke dieds. in planar conjugated N'
+       write(*,'(2X,A)') '--[no]adhoc-dihedral-deps    Add aromatic '// &
+                                     'ad hoc rigid/improper dependencies'
        write(*,*) 
        write(*,'(A)') 'INTRAMOLEULAR NONBONDED INTERACTIONS'
        write(*,'(2X,A)') '-[no]pairs,--[no]intranb     Add pairs'
@@ -1352,7 +1427,7 @@
 !
 ! This subroutine 
 !
-       subroutine geninp(nat,lab,coord,bas,formt,meth,basis,disp,      &
+       subroutine geninp(nat,lab,coord,bas,qmdir,formt,meth,basis,disp,&
                          chrg,mult)
 !
        use lengths,  only: leninp,lentag,lenlab
@@ -1363,6 +1438,7 @@
 ! Input/output variables
 !
        character(len=leninp),intent(in)          ::  bas     !
+       character(len=leninp),intent(in)          ::  qmdir   !
        character(len=lenlab),dimension(nat)      ::  lab     !  Atomic labels
        real(kind=8),dimension(3,nat),intent(in)  ::  coord   ! 
        integer,intent(in)                        ::  nat     !
@@ -1385,7 +1461,8 @@
        select case (trim(formt))
          case('orca')
 !
-           open(unit=uniout,file=trim(bas)//'_of.inp',action='write')
+           open(unit=uniout,file=trim(qmdir)//trim(bas)//'_of.inp',    &
+                action='write')
 !
 
 !
@@ -1399,7 +1476,8 @@
              cdisp = 'empiricaldispersion='//trim(disp)
            end if 
 !
-           open(unit=uniout,file=trim(bas)//'_of.com',action='write')
+           open(unit=uniout,file=trim(qmdir)//trim(bas)//'_of.com',    &
+                action='write')
 !
            write(uniout,'(A)') '%nprocshared=8'
            write(uniout,'(A)') '%chk='//trim(bas)//'_of.chk'
@@ -1697,7 +1775,7 @@
 ! -------------------------------
 !
        qmfile = adjustl(qmout)
-       qmfile = qmfile(:len_trim(qmfile)-4)//'.fcc'
+       qmfile = qmfile(:len_trim(qmfile)-4)//'.fchk'
 !
        open(unit=unijoyce,file='joyce.step1.inp',action='write')
 !
@@ -1778,7 +1856,7 @@
 ! -------------------------------
 !
        qmfile = adjustl(qmout)
-       qmfile = qmfile(:len_trim(qmfile)-4)//'.fcc'
+       qmfile = qmfile(:len_trim(qmfile)-4)//'.fchk'
 !
        open(unit=unijoyce,file='joyce.step2.inp',action='write')
 !
