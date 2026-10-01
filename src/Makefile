@@ -10,7 +10,7 @@ libpath= -lblas -llapack
 FC = gfortran -I$(IDIR) -J$(MDIR)  # -Wno-argument-mismatch 
 FLFLAGS = -g
 FCFLAGS = -g -c -Wall -Wextra -Wconversion -Og -fcheck=bounds -fmax-errors=5
-PROGRAM = atomtypes
+PROGRAM = gen_FF
 SRCF90  = equivalent.f90
 SRCMOD  = lengths.f90       \
           units.f90         \
