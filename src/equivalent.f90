@@ -1930,7 +1930,8 @@
          do i = 1, bonded%nbond
            write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
              bonded%sbond(i),'=',ref_bond_k(refbonded,bonded%ibond(:,i),&
-             bonded%fbond(i),bonded%kbond(i)),trim(bonded%labbond(i))
+             bonded%fbond(i),bonded%kbond(i))/100.d0,                   &
+             trim(bonded%labbond(i))
          end do
 !
          do i = 1, bonded%nang
