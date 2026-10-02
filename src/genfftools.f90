@@ -16,6 +16,7 @@
                    genquad,                                            &
                    findarcycles,                                       &
                    bonded2dihe,                                        &
+                   apply_ref_flexible_terms,                           &
                    selectquad,                                         &
                    screenquad,                                         &
                    calc_angle,                                         &
@@ -723,6 +724,238 @@
 !
        return
        end subroutine bonded2dihe
+!
+!======================================================================!
+!
+! APPLY_REF_FLEXIBLE_TERMS - use reference topology flexible terms
+!
+! This subroutine preserves the Fourier multiplicities explicitly present in a
+! reference topology.  It is useful in Step 2, where bonded terms are generated
+! again from QM data but the user may have removed some soft torsional terms
+! after Step 1.
+!
+       subroutine apply_ref_flexible_terms(dihe,refbonded)
+!
+       use datatypes,  only:  grobonded,                               &
+                              dihedrals,                               &
+                              torsion
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(inout)       ::  dihe      !
+       type(grobonded),intent(in)          ::  refbonded !
+!
+! Local variables
+!
+       logical,dimension(:),allocatable    ::  matched  !
+       integer                             ::  i,j,k     !
+       integer                             ::  nmatch    !
+       integer                             ::  source    !
+!
+! Use only explicitly matching proper torsional terms from the reference
+! topology.  The matching is done by atom quadruplet and function type; atom
+! order can be reversed.
+!
+       if ( dihe%nflexi .le. 0 ) return
+!
+       allocate(matched(dihe%nflexi))
+       matched(:) = .FALSE.
+!
+       do i = 1, dihe%nflexi
+!
+         nmatch = 0
+         do j = 1, refbonded%ndihe
+           if ( refbonded%fdihe(j) .ne. dihe%fflexi(i) ) cycle
+           if ( same_flexible_quad(refbonded%idihe(:,j),               &
+                                   dihe%iflexi(:,i)) ) then
+             nmatch = nmatch + 1
+           end if
+         end do
+!
+         if ( nmatch .le. 0 ) cycle
+!
+         matched(i) = .TRUE.
+!
+         if ( allocated(dihe%flexi(i)%tor) ) deallocate(dihe%flexi(i)%tor)
+         dihe%flexi(i)%ntor = nmatch
+         allocate(dihe%flexi(i)%tor(nmatch))
+         dihe%flexi(i)%itor(:) = dihe%iflexi(:,i)
+!
+         k = 0
+         do j = 1, refbonded%ndihe
+           if ( refbonded%fdihe(j) .ne. dihe%fflexi(i) ) cycle
+           if ( same_flexible_quad(refbonded%idihe(:,j),               &
+                                   dihe%iflexi(:,i)) ) then
+             k = k + 1
+             dihe%flexi(i)%tor(k)%phase = refbonded%dihe(j)
+             dihe%flexi(i)%tor(k)%vtor  = refbonded%kdihe(j)
+             dihe%flexi(i)%tor(k)%multi = refbonded%multi(j)
+           end if
+         end do
+!
+       end do
+!
+! If a topology contains only the independent member of a dependent flexible
+! torsion group, keep the dependent member synchronized with the same
+! multiplicities.  This preserves user-edited Fourier truncations between
+! Step 1 and Step 2 while keeping the dependent term's own phase.
+!
+       if ( allocated(dihe%depquad) ) then
+         do i = 1, dihe%nflexi
+           if ( matched(i) ) cycle
+!
+           source = 0
+           if ( dihe%depquad(i) .gt. 0 ) then
+             source = find_quad_flex_term(dihe,                       &
+                                          dihe%iquad(:,dihe%depquad(i)))
+             if ( source .gt. 0 ) then
+               if ( .NOT. matched(source) ) source = 0
+             end if
+           else
+             do j = 1, dihe%nflexi
+               if ( .NOT. matched(j) ) cycle
+               if ( dihe%depquad(j) .le. 0 ) cycle
+               if ( same_flexible_quad(dihe%iflexi(:,i),              &
+                    dihe%iquad(:,dihe%depquad(j))) ) then
+                 source = j
+                 exit
+               end if
+             end do
+           end if
+!
+           if ( source .gt. 0 ) call mirror_reference_terms(dihe,i,source)
+!
+         end do
+       end if
+!
+       deallocate(matched)
+!
+       return
+!
+       contains
+!
+       logical function same_flexible_quad(ia,ib)
+!
+       integer,dimension(4),intent(in)     ::  ia !
+       integer,dimension(4),intent(in)     ::  ib !
+!
+       same_flexible_quad =                                          &
+         ( (ia(1).eq.ib(1)).and.(ia(2).eq.ib(2)).and.                 &
+           (ia(3).eq.ib(3)).and.(ia(4).eq.ib(4)) ) .or.               &
+         ( (ia(1).eq.ib(4)).and.(ia(2).eq.ib(3)).and.                 &
+           (ia(3).eq.ib(2)).and.(ia(4).eq.ib(1)) )
+!
+       return
+       end function same_flexible_quad
+!
+!----------------------------------------------------------------------!
+!
+       integer function find_quad_flex_term(dihe,iquad)
+!
+       type(dihedrals),intent(in)          ::  dihe  !
+       integer,dimension(4),intent(in)     ::  iquad !
+       integer                             ::  k     !
+!
+       find_quad_flex_term = 0
+       do k = 1, dihe%nflexi
+         if ( same_flexible_quad(dihe%iflexi(:,k),iquad) ) then
+           find_quad_flex_term = k
+           return
+         end if
+       end do
+!
+       return
+       end function find_quad_flex_term
+!
+!----------------------------------------------------------------------!
+!
+       subroutine mirror_reference_terms(dihe,target,source)
+!
+       type(dihedrals),intent(inout)       ::  dihe    !
+       integer,intent(in)                  ::  target  !
+       integer,intent(in)                  ::  source  !
+!
+       type(torsion),dimension(:),allocatable :: oldtor !
+       integer                             ::  old_n   !
+       integer                             ::  k       !
+!
+       if ( source .eq. target ) return
+       if ( dihe%flexi(source)%ntor .le. 0 ) return
+!
+       old_n = dihe%flexi(target)%ntor
+       if ( old_n .gt. 0 ) then
+         allocate(oldtor(old_n))
+         oldtor = dihe%flexi(target)%tor
+       end if
+!
+       if ( allocated(dihe%flexi(target)%tor) )                        &
+         deallocate(dihe%flexi(target)%tor)
+!
+       dihe%flexi(target)%ntor = dihe%flexi(source)%ntor
+       allocate(dihe%flexi(target)%tor(dihe%flexi(target)%ntor))
+       dihe%flexi(target)%itor(:) = dihe%iflexi(:,target)
+!
+       do k = 1, dihe%flexi(target)%ntor
+         dihe%flexi(target)%tor(k)%multi =                            &
+                                  dihe%flexi(source)%tor(k)%multi
+         dihe%flexi(target)%tor(k)%phase = term_phase(oldtor,old_n,   &
+                                  dihe%flexi(source)%tor(k)%multi,    &
+                                  dihe%dflexi(target))
+         dihe%flexi(target)%tor(k)%vtor = term_vtor(oldtor,old_n,     &
+                                  dihe%flexi(source)%tor(k)%multi)
+       end do
+!
+       if ( allocated(oldtor) ) deallocate(oldtor)
+!
+       return
+       end subroutine mirror_reference_terms
+!
+!----------------------------------------------------------------------!
+!
+       real(kind=8) function term_phase(oldtor,old_n,multi,default)
+!
+       type(torsion),dimension(:),allocatable,intent(in) :: oldtor !
+       integer,intent(in)                  ::  old_n   !
+       integer,intent(in)                  ::  multi   !
+       real(kind=8),intent(in)             ::  default !
+       integer                             ::  k       !
+!
+       term_phase = default
+       if ( old_n .le. 0 ) return
+       do k = 1, old_n
+         if ( oldtor(k)%multi .eq. multi ) then
+           term_phase = oldtor(k)%phase
+           return
+         end if
+       end do
+!
+       return
+       end function term_phase
+!
+!----------------------------------------------------------------------!
+!
+       real(kind=8) function term_vtor(oldtor,old_n,multi)
+!
+       type(torsion),dimension(:),allocatable,intent(in) :: oldtor !
+       integer,intent(in)                  ::  old_n   !
+       integer,intent(in)                  ::  multi   !
+       integer                             ::  k       !
+!
+       term_vtor = 0.0d0
+       if ( old_n .le. 0 ) return
+       do k = 1, old_n
+         if ( oldtor(k)%multi .eq. multi ) then
+           term_vtor = oldtor(k)%vtor
+           return
+         end if
+       end do
+!
+       return
+       end function term_vtor
+!
+       end subroutine apply_ref_flexible_terms
 !
 !======================================================================!
 !

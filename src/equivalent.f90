@@ -701,6 +701,11 @@
                           laroma,latar,lch3,ich3,znum,top%bonded,dihe, &
                           iroute,fring,fhetero,fdouble,fnitrogen,debug)
 !
+         if ( len_trim(intop) .gt. 0 ) then
+           call read_dihe(reftop%bonded,intop,uniinp)
+           call apply_ref_flexible_terms(dihe,reftop%bonded)
+         end if
+!
        else
 !
          allocate(top%bonded%bond(reftop%bonded%nbond),                &
@@ -938,19 +943,32 @@
                     reftop%atom%charge,reftop%atom%cgnr,               &
                     reftop%atom%atnr,reftop%atom%resnr)
 !
-         if ( .NOT. fqmout ) then
-!
-           deallocate(reftop%bonded%bond,reftop%bonded%kbond,          &
-                      reftop%bonded%ibond,reftop%bonded%ang,           &
-                      reftop%bonded%kang,reftop%bonded%iang,           &
-                      reftop%bonded%dihe,reftop%bonded%kdihe,          &
-                      reftop%bonded%idihe,reftop%bonded%multi)
-!
-           deallocate(reftop%bonded%c0,reftop%bonded%c1,               &
-                      reftop%bonded%c2,reftop%bonded%c3,               &
-                      reftop%bonded%c4,reftop%bonded%c5)
-!
-         end if
+         if ( allocated(reftop%bonded%bond) )                          &
+           deallocate(reftop%bonded%bond)
+         if ( allocated(reftop%bonded%kbond) )                         &
+           deallocate(reftop%bonded%kbond)
+         if ( allocated(reftop%bonded%ibond) )                         &
+           deallocate(reftop%bonded%ibond)
+         if ( allocated(reftop%bonded%ang) )                           &
+           deallocate(reftop%bonded%ang)
+         if ( allocated(reftop%bonded%kang) )                          &
+           deallocate(reftop%bonded%kang)
+         if ( allocated(reftop%bonded%iang) )                          &
+           deallocate(reftop%bonded%iang)
+         if ( allocated(reftop%bonded%dihe) )                          &
+           deallocate(reftop%bonded%dihe)
+         if ( allocated(reftop%bonded%kdihe) )                         &
+           deallocate(reftop%bonded%kdihe)
+         if ( allocated(reftop%bonded%idihe) )                         &
+           deallocate(reftop%bonded%idihe)
+         if ( allocated(reftop%bonded%multi) )                         &
+           deallocate(reftop%bonded%multi)
+         if ( allocated(reftop%bonded%c0) ) deallocate(reftop%bonded%c0)
+         if ( allocated(reftop%bonded%c1) ) deallocate(reftop%bonded%c1)
+         if ( allocated(reftop%bonded%c2) ) deallocate(reftop%bonded%c2)
+         if ( allocated(reftop%bonded%c3) ) deallocate(reftop%bonded%c3)
+         if ( allocated(reftop%bonded%c4) ) deallocate(reftop%bonded%c4)
+         if ( allocated(reftop%bonded%c5) ) deallocate(reftop%bonded%c5)
 !
        end if
 !
@@ -1908,34 +1926,34 @@
          write(unijoyce,'(A)') '$assign' 
 !
          do i = 1, bonded%nbond
-           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+           write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
              bonded%sbond(i),'=',ref_bond_k(refbonded,bonded%ibond(:,i),&
              bonded%fbond(i),bonded%kbond(i)),trim(bonded%labbond(i))
          end do
 !
          do i = 1, bonded%nang
-           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+           write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
                 bonded%sang(i),'=',ref_angle_k(refbonded,              &
                 bonded%iang(:,i),bonded%fang(i),bonded%kang(i)),       &
                 trim(bonded%labang(i))
          end do
 !
          do i = 1, dihe%nrigid
-           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+           write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
                 dihe%srigid(i),'=',ref_dihe_k(refbonded,               &
                 dihe%irigid(:,i),dihe%frigid(i),0,dihe%krigid(i)),     &
                 trim(dihe%labrigid(i))
          end do
 !
          do i = 1, dihe%ninv
-           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+           write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
                       dihe%sinv(i),'=',ref_dihe_k(refbonded,           &
                       dihe%iinv(:,i),dihe%finv(i),0,dihe%kinv(i)),     &
                       trim(dihe%labinv(i))
          end do
 !
          do i = 1, dihe%nimpro
-           write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
+           write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
                 dihe%simpro(i),'=',ref_dihe_k(refbonded,               &
                 dihe%iimpro(:,i),dihe%fimpro(i),0,dihe%kimpro(i)),     &
                 trim(dihe%labimpro(i))
