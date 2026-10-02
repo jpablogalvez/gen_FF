@@ -2507,6 +2507,10 @@
                          sdihe(i),'=',sdihe(qterm(idep,mdihe(i))),     &
                                   '*1.d0 ; '//trim(labdihe(i))//' = '//&
                                   trim(labdihe(qterm(idep,mdihe(i))))
+               write(unitmp,'(3X,I4,1X,A,1X,I4,A)')                    &
+                         sdihe(i),'=',sdihe(qterm(idep,mdihe(i))),     &
+                                  '*1.d0 ; '//trim(labdihe(i))//' = '//&
+                                  trim(labdihe(qterm(idep,mdihe(i))))
                ldep(i) = .TRUE.
              end if
            end if
@@ -2527,6 +2531,9 @@
                                   sdihe(j),'=',sdihe(i),'*1.d0 ; '//   &
                                trim(labdihe(j))//' = '//trim(labdihe(i))
                write(uniscr,'(3X,I4,1X,A,1X,I4,A)')                    &
+                                  sdihe(j),'=',sdihe(i),'*1.d0 ; '//   &
+                               trim(labdihe(j))//' = '//trim(labdihe(i))
+               write(unitmp,'(3X,I4,1X,A,1X,I4,A)')                    &
                                   sdihe(j),'=',sdihe(i),'*1.d0 ; '//   &
                                trim(labdihe(j))//' = '//trim(labdihe(i))
              end if
