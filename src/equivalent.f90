@@ -1289,10 +1289,12 @@
                  '--nostar-nitrogen')
              fnitrogen = .FALSE.
 !
-           case ('-adhoc-dihedral-deps','--adhoc-dihedral-deps')
+           case ('-adhoc-deps','--adhoc-deps',                         &
+                 '-adhoc-dihedral-deps','--adhoc-dihedral-deps')
              fadhocdihedeps = .TRUE.
 !
-           case ('-noadhoc-dihedral-deps','--noadhoc-dihedral-deps')
+           case ('-noadhoc-deps','--noadhoc-deps',                     &
+                 '-noadhoc-dihedral-deps','--noadhoc-dihedral-deps')
              fadhocdihedeps = .FALSE.
 !
            case ('-pquad','-principal-quad','--principal-quad',        &
@@ -1397,7 +1399,7 @@
                                          'ke dieds. in C=C double bonds'
        write(*,'(2X,A)') '--[no]star-nitrogen          Add star li'//  &
                                      'ke dieds. in planar conjugated N'
-       write(*,'(2X,A)') '--[no]adhoc-dihedral-deps    Add aromatic '// &
+       write(*,'(2X,A)') '--[no]adhoc-deps             Add aromatic '// &
                                      'ad hoc rigid/improper dependencies'
        write(*,*) 
        write(*,'(A)') 'INTRAMOLEULAR NONBONDED INTERACTIONS'
