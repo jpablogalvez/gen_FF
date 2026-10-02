@@ -1823,10 +1823,11 @@
                               fsymm,intop,bonded,dihe,nstep)
 !
        use lengths,   only: leninp,lenline
-       use units,     only: unijoyce,uniscr
+       use units,     only: unijoyce,uniscr,uniinp
 !
        use datatypes,   only: grobonded,                               &
                               dihedrals
+       use gromacs_files, only: read_bond, read_angle, read_dihe
 !
        implicit none
 !
@@ -1850,6 +1851,7 @@
        character(len=10)                         ::  cnum    !
        character(len=leninp)                     ::  qmfile  !
        character(len=lenline)                    ::  line    !
+       type(grobonded)                           ::  refbonded !
        integer                                   ::  io      !
        integer                                   ::  i,j     !
 !
@@ -1899,31 +1901,44 @@
 ! If reference topology is supplied print assignments
 !
        if ( len_trim(intop) .gt. 0 ) then
+         call read_bond(refbonded,intop,uniinp)
+         call read_angle(refbonded,intop,uniinp)
+         call read_dihe(refbonded,intop,uniinp)
+!
          write(unijoyce,'(A)') '$assign' 
 !
          do i = 1, bonded%nbond
            write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
-             bonded%sbond(i),'=',bonded%kbond(i),trim(bonded%labbond(i))
+             bonded%sbond(i),'=',ref_bond_k(refbonded,bonded%ibond(:,i),&
+             bonded%fbond(i),bonded%kbond(i)),trim(bonded%labbond(i))
          end do
 !
          do i = 1, bonded%nang
            write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
-                bonded%sang(i),'=',bonded%kang(i),trim(bonded%labang(i))
+                bonded%sang(i),'=',ref_angle_k(refbonded,              &
+                bonded%iang(:,i),bonded%fang(i),bonded%kang(i)),       &
+                trim(bonded%labang(i))
          end do
 !
          do i = 1, dihe%nrigid
            write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
-                dihe%srigid(i),'=',dihe%krigid(i),trim(dihe%labrigid(i))
+                dihe%srigid(i),'=',ref_dihe_k(refbonded,               &
+                dihe%irigid(:,i),dihe%frigid(i),0,dihe%krigid(i)),     &
+                trim(dihe%labrigid(i))
          end do
 !
          do i = 1, dihe%ninv
            write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
-                      dihe%sinv(i),'=',dihe%kinv(i),trim(dihe%labinv(i))
+                      dihe%sinv(i),'=',ref_dihe_k(refbonded,           &
+                      dihe%iinv(:,i),dihe%finv(i),0,dihe%kinv(i)),     &
+                      trim(dihe%labinv(i))
          end do
 !
          do i = 1, dihe%nimpro
            write(unijoyce,'(I4,1X,A,1X,F14.7,5X,A)')                   &
-                dihe%simpro(i),'=',dihe%kimpro(i),trim(dihe%labimpro(i))
+                dihe%simpro(i),'=',ref_dihe_k(refbonded,               &
+                dihe%iimpro(:,i),dihe%fimpro(i),0,dihe%kimpro(i)),     &
+                trim(dihe%labimpro(i))
          end do
 !
          write(unijoyce,'(A)') '$end'
@@ -1978,6 +1993,121 @@
        close(unijoyce)
 !
        return
+!
+       contains
+!
+       real(kind=8) function ref_bond_k(refbonded,ibond,fbond,kdefault)
+!
+       type(grobonded),intent(in)          ::  refbonded !
+       integer,dimension(2),intent(in)     ::  ibond     !
+       integer,intent(in)                  ::  fbond     !
+       real(kind=8),intent(in)             ::  kdefault  !
+       integer                             ::  k         !
+!
+       ref_bond_k = kdefault
+       do k = 1, refbonded%nbond
+         if ( refbonded%fbond(k) .ne. fbond ) cycle
+         if ( same_pair(refbonded%ibond(:,k),ibond) ) then
+           ref_bond_k = refbonded%kbond(k)
+           return
+         end if
+       end do
+!
+       return
+       end function ref_bond_k
+!
+!----------------------------------------------------------------------!
+!
+       real(kind=8) function ref_angle_k(refbonded,iang,fang,kdefault)
+!
+       type(grobonded),intent(in)          ::  refbonded !
+       integer,dimension(3),intent(in)     ::  iang      !
+       integer,intent(in)                  ::  fang      !
+       real(kind=8),intent(in)             ::  kdefault  !
+       integer                             ::  k         !
+!
+       ref_angle_k = kdefault
+       do k = 1, refbonded%nang
+         if ( refbonded%fang(k) .ne. fang ) cycle
+         if ( same_triple(refbonded%iang(:,k),iang) ) then
+           ref_angle_k = refbonded%kang(k)
+           return
+         end if
+       end do
+!
+       return
+       end function ref_angle_k
+!
+!----------------------------------------------------------------------!
+!
+       real(kind=8) function ref_dihe_k(refbonded,idihe,fdihe,mdihe,   &
+                                        kdefault)
+!
+       type(grobonded),intent(in)          ::  refbonded !
+       integer,dimension(4),intent(in)     ::  idihe     !
+       integer,intent(in)                  ::  fdihe     !
+       integer,intent(in)                  ::  mdihe     !
+       real(kind=8),intent(in)             ::  kdefault  !
+       integer                             ::  k         !
+!
+       ref_dihe_k = kdefault
+       do k = 1, refbonded%ndihe
+         if ( refbonded%fdihe(k) .ne. fdihe ) cycle
+         if ( mdihe .gt. 0 ) then
+           if ( refbonded%multi(k) .ne. mdihe ) cycle
+         end if
+         if ( same_quad(refbonded%idihe(:,k),idihe) ) then
+           ref_dihe_k = refbonded%kdihe(k)
+           return
+         end if
+       end do
+!
+       return
+       end function ref_dihe_k
+!
+!----------------------------------------------------------------------!
+!
+       logical function same_pair(ia,ib)
+!
+       integer,dimension(2),intent(in)     ::  ia !
+       integer,dimension(2),intent(in)     ::  ib !
+!
+       same_pair = ( (ia(1).eq.ib(1)).and.(ia(2).eq.ib(2)) ) .or.      &
+                   ( (ia(1).eq.ib(2)).and.(ia(2).eq.ib(1)) )
+!
+       return
+       end function same_pair
+!
+!----------------------------------------------------------------------!
+!
+       logical function same_triple(ia,ib)
+!
+       integer,dimension(3),intent(in)     ::  ia !
+       integer,dimension(3),intent(in)     ::  ib !
+!
+       same_triple = ( (ia(1).eq.ib(1)).and.(ia(2).eq.ib(2)).and.      &
+                       (ia(3).eq.ib(3)) ) .or.                         &
+                     ( (ia(1).eq.ib(3)).and.(ia(2).eq.ib(2)).and.      &
+                       (ia(3).eq.ib(1)) )
+!
+       return
+       end function same_triple
+!
+!----------------------------------------------------------------------!
+!
+       logical function same_quad(ia,ib)
+!
+       integer,dimension(4),intent(in)     ::  ia !
+       integer,dimension(4),intent(in)     ::  ib !
+!
+       same_quad = ( (ia(1).eq.ib(1)).and.(ia(2).eq.ib(2)).and.        &
+                     (ia(3).eq.ib(3)).and.(ia(4).eq.ib(4)) ) .or.      &
+                   ( (ia(1).eq.ib(4)).and.(ia(2).eq.ib(3)).and.        &
+                     (ia(3).eq.ib(2)).and.(ia(4).eq.ib(1)) )
+!
+       return
+       end function same_quad
+!
        end subroutine print_step2
 !
 !======================================================================!

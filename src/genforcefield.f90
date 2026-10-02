@@ -2433,7 +2433,7 @@
        integer,dimension(ndihe)                       ::  mdihe    !
        integer,dimension(ndihe)                       ::  iddihe   !
        integer,dimension(ndihe)                       ::  iflexterm!
-       integer,dimension(ndihe)                       ::  qterm    !
+       integer,dimension(ndihe,0:ndihe)               ::  qterm    !
        integer,dimension(ndihe)                       ::  ivaux    !
        integer                                        ::  idep     !
        integer                                        ::  niddihe  !
@@ -2478,16 +2478,15 @@
 !
        lquad(:) = .FALSE.
        ldep(:)  = .FALSE.
-       qterm(:) = 0
+       qterm(:,:) = 0
        do i = 1, dihe%nquad
          do j = 1, nterm
-           if ( lquad(j) ) cycle
            if ( (idihe(1,j).eq.dihe%iquad(1,i))                        &
                  .and. (idihe(2,j).eq.dihe%iquad(2,i))                 &
                  .and. (idihe(3,j).eq.dihe%iquad(3,i))                 &
                  .and. (idihe(4,j).eq.dihe%iquad(4,i)) ) then                 
              lquad(j) = .TRUE.
-             qterm(i) = j
+             qterm(i,mdihe(j)) = j
            end if
          end do
        end do
@@ -2499,15 +2498,15 @@
          do i = 1, nterm
            idep = dihe%depquad(iflexterm(i))
            if ( (idep.gt.0).and.(idep.le.dihe%nquad) ) then
-             if ( qterm(idep) .gt. 0 ) then
+             if ( qterm(idep,mdihe(i)) .gt. 0 ) then
                write(unideps,'(3X,I4,1X,A,1X,I4,A)')                   &
-                                  sdihe(i),'=',sdihe(qterm(idep)),     &
+                         sdihe(i),'=',sdihe(qterm(idep,mdihe(i))),     &
                                   '*1.d0 ; '//trim(labdihe(i))//' = '//&
-                                  trim(labdihe(qterm(idep)))
+                                  trim(labdihe(qterm(idep,mdihe(i))))
                write(uniscr,'(3X,I4,1X,A,1X,I4,A)')                    &
-                                  sdihe(i),'=',sdihe(qterm(idep)),     &
+                         sdihe(i),'=',sdihe(qterm(idep,mdihe(i))),     &
                                   '*1.d0 ; '//trim(labdihe(i))//' = '//&
-                                  trim(labdihe(qterm(idep)))
+                                  trim(labdihe(qterm(idep,mdihe(i))))
                ldep(i) = .TRUE.
              end if
            end if
