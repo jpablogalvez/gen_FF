@@ -1111,7 +1111,7 @@
        fsig = 1.0
        feps = 1.0
 !
-       fsymm  = .TRUE.
+       fsymm  = .FALSE.
        fpairs = .FALSE.
        fexcl  = .TRUE.
 !
