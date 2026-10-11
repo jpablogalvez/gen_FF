@@ -39,6 +39,7 @@
        logical                                         ::  fdouble  !  
        logical                                         ::  fnitrogen !  
        logical                                         ::  fadhocdihedeps !
+       logical                                         ::  fideal   !
        logical                                         ::  fquad    !
        logical                                         ::  fsymm    !
        logical                                         ::  fpairs   !
@@ -154,7 +155,7 @@
                          iroute,formt,meth,basis,disp,chrg,mult,step,  &
                          nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
                          fpairs,fexcl,fquad,fring,fhetero,fdouble,      &
-                         fnitrogen,fadhocdihedeps,debug)
+                         fnitrogen,fadhocdihedeps,fideal,debug)
 !
 ! Checking qmdir definition
 !
@@ -706,7 +707,8 @@
 !
          call genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,lcycle,lrigid, &
                           laroma,latar,lch3,ich3,znum,top%bonded,dihe, &
-                          iroute,fring,fhetero,fdouble,fnitrogen,debug)
+                          iroute,fring,fhetero,fdouble,fnitrogen,      &
+                          fideal,debug)
 !
        else
 !
@@ -1023,7 +1025,7 @@
                                step,nstep,sysname,resname,nmol,fsig,   &
                                feps,fsymm,fpairs,fexcl,fquad,fring,    &
                                fhetero,fdouble,fnitrogen,fadhocdihedeps,&
-                               debug)
+                               fideal,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -1058,6 +1060,7 @@
        logical,intent(out)                ::  fdouble  !  
        logical,intent(out)                ::  fnitrogen !  
        logical,intent(out)                ::  fadhocdihedeps !
+       logical,intent(out)                ::  fideal   !
 !
        character(len=20),intent(out)      ::  meth     !
        character(len=20),intent(out)      ::  basis    !
@@ -1096,6 +1099,7 @@
        fdouble = .TRUE.
        fnitrogen = .FALSE.
        fadhocdihedeps = .TRUE.
+       fideal = .TRUE.
 !
        formt  = 'g16'
        step  = 15.0
@@ -1299,6 +1303,15 @@
                  '-noadhoc-dihedral-deps','--noadhoc-dihedral-deps')
              fadhocdihedeps = .FALSE.
 !
+           case ('-ideal','-idealval','--ideal','--idealval',          &
+                 '--ideal-values','--ideal-equilibrium')
+             fideal = .TRUE.
+!
+           case ('-noideal','-noidealval','--noideal','--noidealval',  &
+                 '--no-ideal','--no-idealval','--no-ideal-values',     &
+                 '--geometric-equilibrium')
+             fideal = .FALSE.
+!
            case ('-pquad','-principal-quad','--principal-quad',        &
                                 '--principal-quadruplets','--principal')
              fquad = .TRUE.
@@ -1411,8 +1424,8 @@
        write(*,'(A)') 'EQUILIBRIUM VALUES'
        write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  & ! TODO: to be implemented
                                                        'output topology'  
-       write(*,'(2X,A)') '-[no]ideal,--[no]idealval    Set ideal e'//  & ! TODO: to be implemented
-                                                     'quilibrium values'  
+       write(*,'(2X,A)') '-[no]ideal,--[no]idealval    Use ideal 0'//  &
+                                      '/180 or geometric stiff dihedrals'
        write(*,*)
        write(*,'(A)') 'NONBONDED INTERACTIONS MANIPULATION'
        write(*,'(2X,A)') '-fsig,--factor-sigma         Scale sigma'//  &

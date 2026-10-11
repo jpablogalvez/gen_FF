@@ -615,7 +615,7 @@
        subroutine genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,lcycle, &
                               lrigid,laroma,latar,lch3,ich3,znum,      &
                               bonded,dihed,iroute,fring,fhetero,       &
-                              fdouble,fnitrogen,debug)
+                              fdouble,fnitrogen,fideal,debug)
 !
        use datatypes, only: grobonded,                                 &
                             dihedrals
@@ -647,6 +647,7 @@
        logical,intent(in)                                 ::  fhetero   ! 
        logical,intent(in)                                 ::  fdouble   ! 
        logical,intent(in)                                 ::  fnitrogen ! 
+       logical,intent(in)                                 ::  fideal    !
        logical,intent(in)                                 ::  debug     !  Debug mode
 !
 ! Local variables
@@ -673,7 +674,7 @@
                       lrigid,laroma,latar,lch3,ich3,bonded%nbond,      &
                       bonded%ibond,bonded%nang,bonded%iang,adjang,     &
                       edgeang,dihed,iroute,fring,fhetero,fdouble,      &
-                      fnitrogen,debug)
+                      fnitrogen,fideal,debug)
        end if
 !
        deallocate(adjbond,adjang,edgeang)
@@ -834,7 +835,7 @@
        subroutine gendihe(nat,adj,ideg,idat,coord,wiberg,znum,lcycle, &
                           lrigid,laroma,latar,lch3,ich3,nbond,ibond,   &
                           nang,iang,adjang,edgeang,dihed,iroute,fring, &
-                          fhetero,fdouble,fnitrogen,debug)
+                          fhetero,fdouble,fnitrogen,fideal,debug)
 !
        use datatypes, only: dihedrals
        use graphtools
@@ -870,6 +871,7 @@
        logical,intent(in)                                 ::  fhetero  ! 
        logical,intent(in)                                 ::  fdouble  ! 
        logical,intent(in)                                 ::  fnitrogen ! 
+       logical,intent(in)                                 ::  fideal   !
        logical,intent(in)                                 ::  debug    !  Debug mode
 !
 ! Local variables
@@ -937,7 +939,7 @@
        call setdihe(nat,adj,ideg,idat,coord,wiberg,nbond,ibond,nang,  &
                     edgeang,iang,ndihe,dihed,edges,lcycle,lrigid,      &
                     laroma,latar,lch3,ich3,znum,iroute,fring,fhetero,  &
-                    fdouble,fnitrogen,debug)
+                    fdouble,fnitrogen,fideal,debug)
 !
        deallocate(edges)
 !
@@ -1323,7 +1325,8 @@
        subroutine setdihe(nat,adj,ideg,idat,coord,wiberg,nbond,ibond, &
                           nang,edgeang,iang,ndihe,dihed,edgedihe,      &
                           lcycle,lrigid,laroma,latar,lch3,ich3,znum,   &
-                          iroute,fring,fhetero,fdouble,fnitrogen,debug)
+                          iroute,fring,fhetero,fdouble,fnitrogen,      &
+                          fideal,debug)
 !
        use datatypes,   only: dihedrals
        use genfftools
@@ -1363,6 +1366,7 @@
        logical,intent(in)                        ::  fhetero   ! 
        logical,intent(in)                        ::  fdouble   ! 
        logical,intent(in)                        ::  fnitrogen ! 
+       logical,intent(in)                        ::  fideal    !
 !
 ! Local variables
 !  
@@ -1549,11 +1553,14 @@
 !
                dihed%iimpro(:,dihed%nimpro) = vaux(:)
                dihed%fimpro(dihed%nimpro)   = 2
-               dihed%dimpro(dihed%nimpro)   = 0.0d0    ! TODO: option to pick equilibrium value or set to 0
+               if ( fideal ) then
+                 dihed%dimpro(dihed%nimpro) = 0.0d0
+               else
+                 dihed%dimpro(dihed%nimpro) = daux
+               end if
                primpro(dihed%nimpro)         = improper_priority
                refadequacy(dihed%nimpro)     = reference_adequacy
                refwiberg(dihed%nimpro)       = wiberg(vaux(1),vaux(2))
-!~                dihed%dimpro(dihed%nimpro)   = daux  ! TODO: option to pick equilibrium value or set to 0
 !
              end if
 !
@@ -1816,11 +1823,14 @@
 !
              dihed%irigid(:,dihed%nrigid) = vaux(:)
              dihed%frigid(dihed%nrigid)   = 2
-!~              drigid(nrigid)   = daux     ! TODO: option to pick equilibrium value or set to 0/180
-             if ( abs(daux) .le. 90 ) then  ! TODO: option to pick equilibrium value or set to 0/180
-               dihed%drigid(dihed%nrigid) = 0.0d0
+             if ( fideal ) then
+               if ( abs(daux) .le. 90.0d0 ) then
+                 dihed%drigid(dihed%nrigid) = 0.0d0
+               else
+                 dihed%drigid(dihed%nrigid) = 180.0d0
+               end if
              else
-               dihed%drigid(dihed%nrigid) = 180.0d0
+               dihed%drigid(dihed%nrigid) = daux
              end if
 !
 ! If dihedral angle belongs to a cycle classify it as inversion 
