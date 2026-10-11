@@ -571,6 +571,23 @@
        allocate(dihe%iflexi(4,ndihe),dihe%dflexi(ndihe),               &
                 dihe%kflexi(ndihe),dihe%fflexi(ndihe))
 !
+       dihe%iimpro(:,:) = 0
+       dihe%dimpro(:)   = 0.0d0
+       dihe%kimpro(:)   = 0.0d0
+       dihe%fimpro(:)   = 0
+       dihe%iinv(:,:)   = 0
+       dihe%dinv(:)     = 0.0d0
+       dihe%kinv(:)     = 0.0d0
+       dihe%finv(:)     = 0
+       dihe%irigid(:,:) = 0
+       dihe%drigid(:)   = 0.0d0
+       dihe%krigid(:)   = 0.0d0
+       dihe%frigid(:)   = 0
+       dihe%iflexi(:,:) = 0
+       dihe%dflexi(:)   = 0.0d0
+       dihe%kflexi(:)   = 0.0d0
+       dihe%fflexi(:)   = 0
+!
        dihe%ndihe  = ndihe 
        dihe%nflexi = 0 
        dihe%nrigid = 0 
@@ -600,6 +617,8 @@
 !
            dihe%flexi(dihe%nflexi)%itor(:) = bonded%idihe(:,i)
            dihe%iflexi(:,dihe%nflexi)      = bonded%idihe(:,i)
+           dihe%dflexi(dihe%nflexi)         = bonded%dihe(i)
+           dihe%kflexi(dihe%nflexi)         = bonded%kdihe(i)
 !
            dihe%flexi(dihe%nflexi)%tor(1)%phase = bonded%dihe(i)
            dihe%flexi(dihe%nflexi)%tor(1)%vtor  = bonded%kdihe(i)
@@ -660,6 +679,8 @@
 !
            dihe%fflexi(dihe%nflexi)   = 9
            dihe%iflexi(:,dihe%nflexi) = bonded%idihe(:,i)
+           dihe%dflexi(dihe%nflexi)   = bonded%dihe(i)
+           dihe%kflexi(dihe%nflexi)   = bonded%kdihe(i)
 !
            dihe%flexi(dihe%nflexi)%itor(:) = bonded%idihe(:,i)
 !

@@ -302,6 +302,15 @@
 !
          nat = reftop%nat       
 !
+! A reference topology has priority for the bonded functional form.  Read
+! these sections as soon as the topology is available so they can define the
+! graph and the final [ bonds ], [ angles ], and [ dihedrals ] sections, even
+! when QM output is also present for geometry and Joyce data.
+!
+         call read_bond(reftop%bonded,intop,uniinp)
+         call read_angle(reftop%bonded,intop,uniinp)
+         call read_dihe(reftop%bonded,intop,uniinp)
+!
        else if ( .NOT. fqmout ) then 
 !
 ! If only coordinates file is provided then generate QC input
@@ -346,9 +355,6 @@
 !
 ! If only initial topology is provided then extract FF information
 !
-         call read_bond(reftop%bonded,intop,uniinp)
-         call read_angle(reftop%bonded,intop,uniinp)
-         call read_dihe(reftop%bonded,intop,uniinp)
 !~          call read_pairs(reftop%nonbonded,intop,uniinp)
 !~          call read_excls(reftop%nonbonded,intop,uniinp)
 !
@@ -414,15 +420,16 @@
 ! Generation of the adjacency matrix
 ! ----------------------------------  !  TODO: check bonds are consistent with input topology
 !
-       if ( .NOT. fqmout ) then 
+       if ( len_trim(intop) .gt. 0 ) then
 !
-! If only initial topology is provided then generate topology from bonds
+! If an input topology is provided then use its bonds as the molecular graph
 !
          call bonds2adj(reftop%bonded%nbond,reftop%bonded%ibond,nat,adj)
 !
-         allocate(lab(nat),mass(nat))
+         if ( .NOT. allocated(lab) ) allocate(lab(nat))
+         if ( .NOT. allocated(mass) ) allocate(mass(nat))
 !
-         lab(:)  = reftop%atom%attype(:)
+         if ( .NOT. fqmout ) lab(:) = reftop%atom%attype(:)
          mass(:) = reftop%atom%mass(:)
 !
        else
@@ -695,16 +702,11 @@
 ! Force Field generation
 ! ----------------------
 !
-       if ( fqmout ) then
+       if ( (fqmout) .and. (len_trim(intop) .eq. 0) ) then
 !
          call genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,lcycle,lrigid, &
                           laroma,latar,lch3,ich3,znum,top%bonded,dihe, &
                           iroute,fring,fhetero,fdouble,fnitrogen,debug)
-!
-         if ( len_trim(intop) .gt. 0 ) then
-           call read_dihe(reftop%bonded,intop,uniinp)
-           call apply_ref_flexible_terms(dihe,reftop%bonded)
-         end if
 !
        else
 !
@@ -742,8 +744,8 @@
 !
 ! Finding quadruplets associated to CH3 rotations
 !
-         allocate(lch3(dihe%nflexi),dihe%ich3(dihe%nflexi))
-         call genmethlist(nat,adj,znum,dihe,dihe%ndihe,lch3,ich3,debug)
+         allocate(lch3(dihe%nflexi),ich3(3,dihe%nflexi))
+         call genmethlist(nat,adj,znum,dihe,dihe%nflexi,lch3,ich3,debug)
 !
 ! TODO: check if equilibrium distances should be taken from external geometry
 !
@@ -752,11 +754,11 @@
 ! Finding unique cuadruplets
 ! --------------------------
 !
-       if ( fquad ) call screenquad(dihe,dihe%nflexi,lch3,ich3,        &
-                                    dihe%ndihe,nat,idat)
+       if ( (fquad) .and. (len_trim(intop) .eq. 0) )                  &
+         call screenquad(dihe,dihe%nflexi,lch3,ich3,dihe%ndihe,nat,idat)
 !
-       if ( dihe%nquad .gt. 1 ) call selectquad(nat,dihe%nquad,dihe,   &
-                                                 idat,nidat,debug) 
+       if ( (dihe%nquad .gt. 1) .and. (len_trim(intop) .eq. 0) )       &
+         call selectquad(nat,dihe%nquad,dihe,idat,nidat,debug)
 !
        fstep2 = .TRUE.
 !
@@ -1874,6 +1876,8 @@
        type(grobonded)                           ::  refbonded !
        integer                                   ::  io      !
        integer                                   ::  i,j     !
+       real(kind=8),parameter                    ::              &
+                                      gromacs_to_joyce_bond_k = 0.01d0
 !
 ! Generating Joyce3 input (step1) 
 ! -------------------------------
@@ -1930,7 +1934,7 @@
          do i = 1, bonded%nbond
            write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
              bonded%sbond(i),'=',ref_bond_k(refbonded,bonded%ibond(:,i),&
-             bonded%fbond(i),bonded%kbond(i))/100.d0,                   &
+             bonded%fbond(i),bonded%kbond(i))*gromacs_to_joyce_bond_k, &
              trim(bonded%labbond(i))
          end do
 !
