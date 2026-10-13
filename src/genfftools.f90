@@ -28,7 +28,7 @@
 !
 ! GENCYCLELIST - GENerate CYCLE LIST
 !
-! This subroutine 
+! This subroutine
 !
        subroutine gencyclelist(nat,r,adj,mcycle,ncycle,cycles,lcycle)
 !
@@ -45,7 +45,7 @@
        integer,intent(in)                      ::  r       !  Cyclic rank
 !
 ! Local variables
-! 
+!
        integer                                 ::  icycle  !
        integer                                 ::  i,j     !
        integer                                 ::  ii,jj   !
@@ -82,7 +82,7 @@
 !
 ! GENRIGIDLIST - GENerate RIGID LIST
 !
-! This subroutine 
+! This subroutine
 !
        subroutine genrigidlist(nat,r,wiberg,coord,znum,cycles,ncycle,  &
                                mcycle,lcycle,lrigid,laroma,latar)
@@ -105,7 +105,7 @@
        integer,intent(in)                          ::  mcycle  !  Number of cycles
 !
 ! Local variables
-! 
+!
        real(kind=8)                                ::  daux    !
        real(kind=8)                                ::  thr     !
        logical                                     ::  lcheck  !
@@ -127,7 +127,7 @@
        laroma(:,:) = .FALSE.
        latar(:)    = .FALSE.
 !
-! We consider rigid bond 
+! We consider rigid bond
 !  if Wiberg index is greater than 1.1 and the bond belongs to a cycle
 !   then it belongs to an aromatic cycle
 !  if Wiberg index is greater than an element-pair threshold then it is
@@ -137,7 +137,7 @@
        do i = 1, nat-1
          do j = i+1, nat
 !
-           if ( (wiberg(j,i).ge.1.1d0).and.lcycle(j,i) ) then 
+           if ( (wiberg(j,i).ge.1.1d0).and.lcycle(j,i) ) then
              lrigid(i,j) = .TRUE.
              lrigid(j,i) = .TRUE.
 !
@@ -188,7 +188,7 @@
            end if
 !
          end do
-! 
+!
          if ( lcheck ) then
            do j = 1, ncycle(i)
              if ( j .lt. ncycle(i) ) then
@@ -209,7 +209,7 @@
            end do
          end if
 !
-       end do     
+       end do
 !
        return
        end subroutine genrigidlist
@@ -218,7 +218,7 @@
 !
 ! GENHEAVYLIST - GENerate HEAVY LIST
 !
-! This subroutine 
+! This subroutine
 !
        subroutine genheavylist(nat,mass,lheavy)
 !
@@ -249,7 +249,7 @@
 !
 ! GENMETHLIST - GENerate METHyl LIST
 !
-! This subroutine 
+! This subroutine
 !
        subroutine genmethlist(nat,adj,znum,dihe,nflexi,lch3,ich3,debug)
 !
@@ -264,7 +264,7 @@
        logical,dimension(nflexi),intent(out)    ::  lch3    !
        integer,dimension(3,nflexi),intent(out)  ::  ich3    !
        integer,dimension(nat),intent(in)        ::  znum    !
-       integer,intent(in)                       ::  nat     !  
+       integer,intent(in)                       ::  nat     !
        integer,intent(in)                       ::  nflexi  !  Number of nodes
        logical,intent(in)                       ::  debug   !
 !
@@ -296,7 +296,7 @@
                if ( znum(j) .ne. 1 ) then
                  match = .FALSE.
                  exit
-               end if                 
+               end if
              end if
            end do
            idx3 = dihe%iflexi(4,i)
@@ -304,7 +304,7 @@
              lch3(i) = .TRUE.
              ich3(1,i) = idx1
              ich3(2,i) = idx2
-             ich3(3,i) = idx3  
+             ich3(3,i) = idx3
              cycle
            end if
          end if
@@ -316,18 +316,18 @@
                if ( znum(j) .ne. 1 ) then
                  match = .FALSE.
                  exit
-               end if                 
+               end if
              end if
            end do
-           idx3 = dihe%iflexi(1,i) 
+           idx3 = dihe%iflexi(1,i)
            if ( match ) then
              lch3(i) = .TRUE.
              ich3(1,i) = idx2
              ich3(2,i) = idx1
-             ich3(3,i) = idx3  
+             ich3(3,i) = idx3
            end if
          end if
-! 
+!
        end do
 !
        if ( debug ) then
@@ -348,7 +348,7 @@
 !
 ! FINDARCYCLES - FIND ARomatic CYCLES
 !
-! This subroutine 
+! This subroutine
 !
        subroutine findarcycles(nat,r,latar,mcycle,ncycle,cycles,       &
                                maroma,naroma,aroma,marunit,narunit,    &
@@ -374,7 +374,7 @@
        integer,intent(in)                      ::  r        !  Cyclic rank
 !
 ! Local variables
-! 
+!
        logical,dimension(nat,nat)              ::  lblist   !
        logical,dimension(mcycle)               ::  notvis   !
        logical                                 ::  lcheck   !
@@ -395,7 +395,7 @@
 !
        do i = 1, mcycle
 !
-         lcheck = .TRUE.    
+         lcheck = .TRUE.
 !
          do j = 1, ncycle(i)
            if ( .NOT. latar(cycles(i,j)) ) then
@@ -409,7 +409,7 @@
            maroma = maroma + 1
 !
            naroma(maroma)  = ncycle(i)
-           aroma(maroma,:) = cycles(i,:)    
+           aroma(maroma,:) = cycles(i,:)
 !
          end if
 !
@@ -450,7 +450,7 @@
 !
              k = queue(iqueue)
 !
-! Adding edges in queue cycle to blacklist  
+! Adding edges in queue cycle to blacklist
 !
              do ii = 1, naroma(k)
                if ( ii .lt. naroma(k) ) then
@@ -494,7 +494,7 @@
                    do jj = 1, naroma(j)
                      lnew = .TRUE.
                      do ii = 1, narunit(marunit)
-                       if ( arunit(marunit,ii) .eq. aroma(j,jj) ) then                       
+                       if ( arunit(marunit,ii) .eq. aroma(j,jj) ) then
                          lnew = .FALSE.
                          exit
                        end if
@@ -528,7 +528,7 @@
 !
 ! BONDED2DIHE - BONDED TO DIHEdral datatype
 !
-! This subroutine 
+! This subroutine
 !
        subroutine bonded2dihe(ndihe,bonded,dihe,nat,adj)
 !
@@ -588,11 +588,11 @@
        dihe%kflexi(:)   = 0.0d0
        dihe%fflexi(:)   = 0
 !
-       dihe%ndihe  = ndihe 
-       dihe%nflexi = 0 
-       dihe%nrigid = 0 
-       dihe%nimpro = 0 
-       dihe%ninv   = 0 
+       dihe%ndihe  = ndihe
+       dihe%nflexi = 0
+       dihe%nrigid = 0
+       dihe%nimpro = 0
+       dihe%ninv   = 0
 !
        dihe%ntor = ndihe
 !
@@ -603,7 +603,7 @@
        do i = 1, ndihe
 !
          if ( visited(i) ) cycle
-!         
+!
          if ( bonded%fdihe(i) .eq. 1 ) then        !  Proper dihedral
 !
            visited(i) = .TRUE.
@@ -611,7 +611,7 @@
            dihe%nflexi = dihe%nflexi + 1
 !
            dihe%flexi(dihe%nflexi)%ntor = 1
-           allocate(dihe%flexi(dihe%nflexi)%tor(1)) 
+           allocate(dihe%flexi(dihe%nflexi)%tor(1))
 !
            dihe%fflexi(dihe%nflexi)     = 1
 !
@@ -626,7 +626,7 @@
 !
          else if ( bonded%fdihe(i) .eq. 2 ) then   !  Improper dihedral
 !
-! Checking if the improper dihedral corresponds to an 
+! Checking if the improper dihedral corresponds to an
 !  out of plane bending or a double (rigid) bond
 !
            visited(i) = .TRUE.
@@ -690,7 +690,7 @@
 ! Counting the proper dihedrals functions sharing the same quadruplet
 !
            dihe%flexi(dihe%nflexi)%ntor = 1
-           do j = i+1, ndihe 
+           do j = i+1, ndihe
 !
              if ( visited(j) ) cycle
              if ( (bonded%idihe(1,i).eq.bonded%idihe(1,j)) .and.       &
@@ -702,14 +702,14 @@
                ldihe(j)   = .TRUE.
 !
                dihe%flexi(dihe%nflexi)%ntor = dihe%flexi(dihe%nflexi)%ntor + 1
-!                 
+!
              end if
 !
            end do
 !
-           allocate(dihe%flexi(dihe%nflexi)%tor(dihe%flexi(dihe%nflexi)%ntor)) 
+           allocate(dihe%flexi(dihe%nflexi)%tor(dihe%flexi(dihe%nflexi)%ntor))
 !
-! Setting multiple dihedrals sharing the same quadruplet 
+! Setting multiple dihedrals sharing the same quadruplet
 !
            k = 0
            do j = 1, ndihe
@@ -732,7 +732,7 @@
              write(*,'(3X,A,I3)')  'Number of terms found    :',k
              write(*,'(2X,68("="))')
              write(*,*)
-             call print_end()  
+             call print_end()
            end if
 !
          else if ( bonded%fdihe(i) .eq. 10 ) then  !  Restricted dihedral
@@ -982,7 +982,7 @@
 !
 ! SELECTQUAD - SELECT QUADruplet
 !
-! This subroutine 
+! This subroutine
 !
        subroutine selectquad(nat,ndihe,dihe,idat,nidat,debug)
 !
@@ -1044,7 +1044,7 @@
          ftmp(k)   = dihe%fquad(i)
          stmp(k)   = dihe%squad(i)
          qmap(i)   = k
-         ntmp = k      
+         ntmp = k
 !
          do j = i+1, dihe%nquad
            if ( visited(j) ) cycle
@@ -1072,7 +1072,7 @@
            end if
          end do
        end if
-       dihe%nquad = ntmp  
+       dihe%nquad = ntmp
 !
        if ( debug ) then
          write(*,'(1X,A)') 'Unique quadruplets'
@@ -1090,7 +1090,7 @@
 !
 ! SCREENQUAD - SCREEN QUADruplet
 !
-! This subroutine 
+! This subroutine
 !
        subroutine screenquad(dihe,nflexi,lch3,ich3,ndihe,nat,idat)
 !
@@ -1117,8 +1117,8 @@
        integer,dimension(4)                    ::  ivaux2   !
        logical                                 ::  ldep     !
        integer                                 ::  i,j,k    !
-! 
-!  Including only principal quadruplets 
+!
+!  Including only principal quadruplets
 ! -------------------------------------
 !
 ! Generating new representation with a reduced set of quadruplets
@@ -1149,7 +1149,7 @@ write(*,*) 'Dihedral',i,'is a CH3 rotation',dihe%iflexi(:,i)
              .or. ((idat(ich3(1,i)).eq.idat(ivaux2(3))).and.             &
                    (idat(ich3(2,i)).eq.idat(ivaux2(2))).and.             &
                    (idat(ich3(3,i)).eq.idat(ivaux2(1))))) ) then
-write(*,*) '  Overlap with princial quadruplet',j,':',dihe%iquad(:,j) 
+write(*,*) '  Overlap with princial quadruplet',j,':',dihe%iquad(:,j)
 write(*,*)
 !
                k = k + 1
@@ -1166,7 +1166,7 @@ write(*,*)
 !
                tmpdihe%flexi(k)%itor(:) = dihe%flexi(i)%itor(:)
                tmpdihe%flexi(k)%tor     = dihe%flexi(i)%tor
-! 
+!
                exit
 !
              end if
@@ -1218,7 +1218,7 @@ write(*,*)
 !
              end if
            end do
-!         
+!
          end if
        end do
 !
@@ -1237,7 +1237,7 @@ write(*,*)
        end do
 !
        dihe%nflexi = tmpdihe%nflexi
-! 
+!
        dihe%iflexi(:,:) = tmpdihe%iflexi(:,:)
        dihe%dflexi(:)   = tmpdihe%dflexi(:)
        dihe%kflexi(:)   = tmpdihe%kflexi(:)
@@ -1251,7 +1251,7 @@ write(*,*)
 !
 ! GENQUAD - GENerate QUADruplet
 !
-! This subroutine 
+! This subroutine
 !
        subroutine genquad(nat,coord,adj,ideg,lcycle,lrigid,znum,dihed, &
                           ndihe,debug)
@@ -1296,7 +1296,7 @@ write(*,*)
 !
        real(kind=8)                       ::  daux      !
 !
-!  Generating principal quadruplets 
+!  Generating principal quadruplets
 ! ---------------------------------
 !
 ! Sorting flexible dihedrals by central bond
@@ -1305,13 +1305,13 @@ write(*,*)
                 tmpdi%fflexi(ndihe))
 !
        visited(:) = .FALSE.
-! 
+!
        neqquad(:) = 0
        meqquad = 0
 !
        k = 0
        do i = 1, dihed%nflexi
-         if ( visited(i) ) cycle 
+         if ( visited(i) ) cycle
 !
          meqquad = meqquad + 1
          neqquad(meqquad) = neqquad(meqquad) + 1
@@ -1328,7 +1328,7 @@ write(*,*)
          do j = 1, dihed%nflexi
            if ( visited(j) ) cycle
 !
-           vaux2(:) = dihed%iflexi(:,j) 
+           vaux2(:) = dihed%iflexi(:,j)
 !
            if ( ((vaux1(2).eq.vaux2(2)).and.(vaux1(3).eq.vaux2(3))) .or. &
                 ((vaux1(2).eq.vaux2(3)).and.(vaux1(3).eq.vaux2(2))) ) then
@@ -1340,15 +1340,15 @@ write(*,*)
              tmpdi%dflexi(k)   = dihed%dflexi(j)
              tmpmap(k)         = j
            end if
-! 
+!
          end do
        end do
 !
-       imap(:) = -1
+       imap(:)    = -1
        iflexi(:)  = -1
        iselect(:) = -1
        sselect(:) = 0
-       nselect = 0
+       nselect    = 0
 !
        if ( allocated(dihed%depquad) ) deallocate(dihed%depquad)
        allocate(dihed%depquad(ndihe))
@@ -1359,50 +1359,69 @@ write(*,*)
 !
 ! Removing H-related dihedrals if possible
 !
+! Each group contains all flexible torsions around the same central bond.
+! Prefer a scan coordinate with heavy atoms at both ends, because such a
+! torsion usually gives the most chemically informative relaxed scan.
+!
          nmap = 0
 !
          flag = .TRUE.
          do j = 1, neqquad(i)
            vaux(:) = tmpdi%iflexi(:,k+j)
-           if ( (znum(vaux(1)).ne.1).and.(znum(vaux(4)).ne.1) ) then 
+           if ( (znum(vaux(1)).ne.1).and.(znum(vaux(4)).ne.1) ) then
              imap(nmap+1) = k + j
              nmap = nmap + 1
            end if
-         end do        
+         end do
 !
          if ( nmap .eq. 0 ) then
+!
+! If no heavy-heavy terminal choice exists, allow one terminal hydrogen.  This
+! still avoids the least informative H--X--Y--H choice when possible.
+!
            flag = .TRUE.
            do j = 1, neqquad(i)
              vaux(:) = tmpdi%iflexi(:,k+j)
-             if ( (znum(vaux(1)).ne.1).or.(znum(vaux(4)).ne.1) ) then 
+             if ( (znum(vaux(1)).ne.1).or.(znum(vaux(4)).ne.1) ) then
                imap(nmap+1) = k + j
                nmap = nmap + 1
              end if
-           end do  
+           end do
          end if
 !
          if ( nmap .eq. 0 ) then
+!
+! Last fallback: all available candidates contain hydrogens at both terminal
+! positions, so keep them rather than losing the rotatable bond entirely.
+!
            flag = .TRUE.
            do j = 1, neqquad(i)
              vaux(:) = tmpdi%iflexi(:,k+j)
-             if ( (znum(vaux(1)).eq.1).and.(znum(vaux(4)).eq.1) ) then 
+             if ( (znum(vaux(1)).eq.1).and.(znum(vaux(4)).eq.1) ) then
                imap(nmap+1) = k + j
                nmap = nmap + 1
              end if
-           end do  
+           end do
          end if
 !
 ! Select multiple ring-exocyclic quadruplets when the exocyclic atom is
-! geometrically compatible with the requested cis/cis-trans cases.
+! geometrically compatible with the requested cis/cis-trans cases
 !
-         call select_ring_exocyclic(nat,coord,adj,ideg,lcycle,lrigid, &
-                                    tmpdi,k,neqquad(i),ndihe,imap,    &
-                                    nmap,iadd,nadd)
+! The special ring-exocyclic logic may return two chemically required torsions:
+! one independent scan coordinate and one dependent torsion preserved in the
+! topology through depquad
+!
+         call selringexo(nat,coord,adj,ideg,lcycle,lrigid,tmpdi,k,     &
+                         neqquad(i),ndihe,imap,nmap,iadd,nadd)
 !
          if ( nadd .gt. 0 ) then
            nselect = nselect + 1
 !
            iselect(nselect) = imap(1)
+!
+! Choose the independent member of the ring-exocyclic pair using the same
+! angular priority as leading_quad.  The remaining returned members become
+! explicit dependencies of this selected scan.
 !
            do j = 1, nmap
              daux = abs(tmpdi%dflexi(imap(j)))
@@ -1449,6 +1468,10 @@ write(*,*)
            sselect(nselect) = 0
            do j = 1, nadd
              if ( iadd(j) .ne. iselect(nselect) ) then
+!
+! depquad is indexed by the original flexible-torsion list
+! tmpmap translates the compact grouped index back to that original index
+!
                dihed%depquad(tmpmap(iadd(j))) = nselect
              end if
            end do
@@ -1497,7 +1520,7 @@ write(*,*)
 !
 !======================================================================!
 !
-       subroutine select_ring_exocyclic(nat,coord,adj,ideg,lcycle,    &
+       subroutine selringexo(nat,coord,adj,ideg,lcycle,    &
                                         lrigid,tmpdi,first,nitem,ndihe,&
                                         imap,nmap,iout,nout)
 
@@ -1505,42 +1528,50 @@ write(*,*)
 !
        implicit none
 !
-       type(dihedrals),intent(in)             ::  tmpdi   !
-       real(kind=8),dimension(3,nat),intent(in) ::  coord !
-       logical,dimension(nat,nat),intent(in)  ::  adj     !
-       logical,dimension(nat,nat),intent(in)  ::  lcycle  !
-       logical,dimension(nat,nat),intent(in)  ::  lrigid  !
-       integer,dimension(nat),intent(in)      ::  ideg    !
-       integer,intent(in)                    ::  nat    !
-       integer,intent(in)                    ::  ndihe  !
-       integer,dimension(ndihe),intent(in)   ::  imap   !
-       integer,dimension(ndihe),intent(out)  ::  iout   !
-       integer,intent(in)                    ::  first  !
-       integer,intent(in)                    ::  nitem  !
-       integer,intent(in)                    ::  nmap   !
-       integer,intent(out)                   ::  nout   !
+       type(dihedrals),intent(in)               ::  tmpdi   !
+       real(kind=8),dimension(3,nat),intent(in) ::  coord   !
+       logical,dimension(nat,nat),intent(in)    ::  adj     !
+       logical,dimension(nat,nat),intent(in)    ::  lcycle  !
+       logical,dimension(nat,nat),intent(in)    ::  lrigid  !
+       integer,dimension(nat),intent(in)        ::  ideg    !
+       integer,intent(in)                       ::  nat     !
+       integer,intent(in)                       ::  ndihe   !
+       integer,dimension(ndihe),intent(in)      ::  imap    !
+       integer,dimension(ndihe),intent(out)     ::  iout    !
+       integer,intent(in)                       ::  first   !
+       integer,intent(in)                       ::  nitem   !
+       integer,intent(in)                       ::  nmap    !
+       integer,intent(out)                      ::  nout    !
 !
-       real(kind=8)                          ::  daux   !
-       logical                               ::  ring1  !
-       logical                               ::  ring2  !
-       integer                               ::  c1     !
-       integer                               ::  c2     !
-       integer                               ::  exo    !
-       integer                               ::  ring   !
-       integer                               ::  ncis   !
-       integer                               ::  ntrans !
-       integer                               ::  j      !
+       real(kind=8)                             ::  daux    !
+       logical                                  ::  ring1   !
+       logical                                  ::  ring2   !
+       integer                                  ::  c1      !
+       integer                                  ::  c2      !
+       integer                                  ::  exo     !
+       integer                                  ::  ring    !
+       integer                                  ::  ncis    !
+       integer                                  ::  ntrans  !
+       integer                                  ::  j       !
 !
        iout(:) = -1
        nout = 0
 !
+! A single candidate cannot create a dependent ring-exocyclic pair.
+!
        if ( nmap .le. 1 ) return
+!
+! The central bond is common to every item in this group.  Identify which side
+! belongs to a ring and which side points to the exocyclic substituent.
 !
        c1 = tmpdi%iflexi(2,first+1)
        c2 = tmpdi%iflexi(3,first+1)
 !
-       ring1 = has_ring_terminal(tmpdi,lcycle,c1,c2,first,nitem)
-       ring2 = has_ring_terminal(tmpdi,lcycle,c2,c1,first,nitem)
+       ring1 = lringtermi(tmpdi,lcycle,c1,c2,first,nitem)
+       ring2 = lringtermi(tmpdi,lcycle,c2,c1,first,nitem)
+!
+! The special rule applies only to true ring--exocyclic bonds.  If both sides
+! are ring-like or both are non-ring, fall back to ordinary leading_quad.
 !
        if ( ring1 .eqv. ring2 ) return
 !
@@ -1552,7 +1583,10 @@ write(*,*)
          exo  = c1
        end if
 !
-       if ( is_sp2_like_exocyclic(nat,coord,adj,ideg,lrigid,exo,ring) ) then
+       if ( lsp2exo(nat,coord,adj,ideg,lrigid,exo,ring) ) then
+! Degree-3 sp2-like exocyclic centers are handled by selecting the two almost
+! cis candidates.  They represent the pair that must be kept together.
+!
          do j = 1, nmap
            daux = abs(tmpdi%dflexi(imap(j)))
            if ( (daux.ge.0.0d0) .and. (daux.le.35.0d0) ) then
@@ -1564,7 +1598,12 @@ write(*,*)
          nout = 0
        end if
 !
-       if ( is_valid_degree2_exocyclic(nat,adj,ideg,exo,ring) ) then
+! Checking if candidate is a valid exocyclic atom with degree 2
+!
+       if ( ldeg2exo(nat,adj,ideg,exo,ring) ) then
+! Degree-2 exocyclic centers are accepted only when the complete group is an
+! unambiguous cis/trans pair.
+!
          ncis   = 0
          ntrans = 0
          do j = 1, nmap
@@ -1582,124 +1621,114 @@ write(*,*)
        end if
 !
        return
-       end subroutine select_ring_exocyclic
+       end subroutine selringexo
 !
 !======================================================================!
 !
-       logical function has_ring_terminal(tmpdi,lcycle,center,other,  &
-                                          first,nitem)
+       logical function lringtermi(tmpdi,lcycle,center,other,  &
+                                   first,nitem)
 
        use datatypes, only: dihedrals
 !
        implicit none
 !
+! Input/output variables
+!
        type(dihedrals),intent(in)          ::  tmpdi   !
        logical,dimension(:,:),intent(in)   ::  lcycle  !
-       integer,intent(in)          ::  center  !
-       integer,intent(in)          ::  other   !
-       integer,intent(in)          ::  first   !
-       integer,intent(in)          ::  nitem   !
+       integer,intent(in)                  ::  center  !
+       integer,intent(in)                  ::  other   !
+       integer,intent(in)                  ::  first   !
+       integer,intent(in)                  ::  nitem   !
 !
-       logical                     ::  match   !
-       integer,dimension(4)        ::  iquad   !
-       integer                     ::  tcenter !
-       integer                     ::  tother  !
-       integer                     ::  j       !
+! Local variables
 !
-       has_ring_terminal = .FALSE.
+       logical                             ::  match   !
+       integer,dimension(4)                ::  iquad   !
+       integer                             ::  tcenter !
+       integer                             ::  tother  !
+       integer                             ::  j       !
+!
+       lringtermi = .FALSE.
 !
        do j = 1, nitem
          iquad(:) = tmpdi%iflexi(:,first+j)
-         call get_terminals(iquad,center,other,tcenter,tother,match)
+!
+! Work out the terminal atom attached to "center" regardless of whether the
+! stored quadruplet is oriented center--other or other--center.
+!
+         match = .FALSE.
+         tcenter = -1
+         tother  = -1
+!
+         if ( (iquad(2).eq.center).and.(iquad(3).eq.other) ) then
+           tcenter = iquad(1)
+           tother  = iquad(4)
+           match = .TRUE.
+         else if ( (iquad(3).eq.center).and.(iquad(2).eq.other) ) then
+           tcenter = iquad(4)
+           tother  = iquad(1)
+           match = .TRUE.
+         end if
+!
          if ( match .and. lcycle(center,tcenter) ) then
-           has_ring_terminal = .TRUE.
+! A terminal connected through a ring bond marks this side as the ring side of
+! the rotatable bond.
+!
+           lringtermi = .TRUE.
            return
          end if
        end do
 !
        return
-       end function has_ring_terminal
+       end function lringtermi
 !
 !======================================================================!
 !
-       subroutine get_terminals(iquad,center,other,tcenter,tother,match)
+       logical function lsp2exo(nat,coord,adj,ideg,lrigid,exo,ring)
 !
        implicit none
 !
-       logical,intent(out)               ::  match   !
-       integer,dimension(4),intent(in)   ::  iquad   !
-       integer,intent(in)                ::  center  !
-       integer,intent(in)                ::  other   !
-       integer,intent(out)               ::  tcenter !
-       integer,intent(out)               ::  tother  !
+! Input/output variables
 !
-       match = .FALSE.
-       tcenter = -1
-       tother  = -1
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord        !
+       logical,dimension(nat,nat),intent(in)     ::  adj          !
+       logical,dimension(nat,nat),intent(in)     ::  lrigid       !
+       integer,dimension(nat),intent(in)         ::  ideg         !
+       integer,intent(in)                        ::  nat          !
+       integer,intent(in)                        ::  exo          !
+       integer,intent(in)                        ::  ring         !
 !
-       if ( (iquad(2).eq.center).and.(iquad(3).eq.other) ) then
-         tcenter = iquad(1)
-         tother  = iquad(4)
-         match = .TRUE.
-       else if ( (iquad(3).eq.center).and.(iquad(2).eq.other) ) then
-         tcenter = iquad(4)
-         tother  = iquad(1)
-         match = .TRUE.
-       end if
+! Local variables
 !
-       return
-       end subroutine get_terminals
+       real(kind=8),dimension(3)                 ::  angle        !
+       real(kind=8)                              ::  asum         !
+       integer,dimension(3)                      ::  nei          !
+       integer                                   ::  n            !
+       integer                                   ::  j            !
+       logical                                   ::  lplanardeg3  !
+       logical                                   ::  exobond      !
 !
-!======================================================================!
+       real(kind=8),parameter                    ::  pi = 4*atan(1.0_8)
 !
-       logical function is_sp2_like_exocyclic(nat,coord,adj,ideg,     &
-                                               lrigid,exo,ring)
+! Checking if exocyclic atom has sp2 hibridization
 !
-       implicit none
+       lsp2exo = .FALSE.
 !
-       real(kind=8),dimension(3,nat),intent(in)  ::  coord   !
-       logical,dimension(nat,nat),intent(in)     ::  adj     !
-       logical,dimension(nat,nat),intent(in)     ::  lrigid  !
-       integer,dimension(nat),intent(in)         ::  ideg    !
-       integer,intent(in)                        ::  nat     !
-       integer,intent(in)               ::  exo   !
-       integer,intent(in)               ::  ring  !
-!
-       is_sp2_like_exocyclic = .FALSE.
+! This route is only meant for trigonal exocyclic atoms.  Degree-2 centers are
+! handled separately by ldeg2exo.
 !
        if ( ideg(exo) .ne. 3 ) return
 !
-       is_sp2_like_exocyclic = is_planar_degree3(nat,coord,adj,exo)   &
-                               .or. has_rigid_exo_bond(nat,adj,lrigid, &
-                                                       exo,ring)
+! Checking if exocyclic atom is planar and has degree 3
 !
-       return
-       end function is_sp2_like_exocyclic
-!
-!======================================================================!
-!
-       logical function is_planar_degree3(nat,coord,adj,idx)
-!
-       implicit none
-!
-       real(kind=8),dimension(3,nat),intent(in) ::  coord  !
-       logical,dimension(nat,nat),intent(in)    ::  adj    !
-       integer,intent(in)                       ::  nat    !
-       integer,intent(in)                 ::  idx    !
-!
-       real(kind=8),dimension(3)          ::  angle  !
-       real(kind=8)                       ::  asum   !
-       integer,dimension(3)               ::  nei    !
-       integer                            ::  n      !
-       integer                            ::  j      !
-!
-       real(kind=8),parameter             ::  pi = 4*atan(1.0_8)
-!
-       is_planar_degree3 = .FALSE.
+       lplanardeg3 = .FALSE.
 !
        n = 0
        do j = 1, nat
-         if ( adj(idx,j) ) then
+         if ( adj(exo,j) ) then
+! Store the three neighbours used to test planarity around the exocyclic atom.
+!
            n = n + 1
            if ( n .le. 3 ) nei(n) = j
          end if
@@ -1707,102 +1736,91 @@ write(*,*)
 !
        if ( n .ne. 3 ) return
 !
-       angle(1) = calc_angle(coord(:,nei(1)),coord(:,idx),coord(:,nei(2))) &
-                  * 180.0d0 / pi
-       angle(2) = calc_angle(coord(:,nei(1)),coord(:,idx),coord(:,nei(3))) &
-                  * 180.0d0 / pi
-       angle(3) = calc_angle(coord(:,nei(2)),coord(:,idx),coord(:,nei(3))) &
-                  * 180.0d0 / pi
+       angle(1) = calc_angle(coord(:,nei(1)),coord(:,exo),             &
+                             coord(:,nei(2)))*180.0d0/pi
+       angle(2) = calc_angle(coord(:,nei(1)),coord(:,exo),             &
+                             coord(:,nei(3)))*180.0d0/pi
+       angle(3) = calc_angle(coord(:,nei(2)),coord(:,exo),             &
+                             coord(:,nei(3)))*180.0d0/pi
 !
        asum = angle(1) + angle(2) + angle(3)
 !
-       is_planar_degree3 = (abs(asum-360.0d0).le.25.0d0)               &
-                          .and. (maxval(angle).lt.170.0d0)
+! A nearly planar degree-3 center is treated as sp2-like.  The max-angle guard
+! avoids accepting almost-linear geometries as trigonal planar.
 !
-       return
-       end function is_planar_degree3
+       lplanardeg3 = (abs(asum-360.0d0).le.25.0d0)                     &
+                                        .and. (maxval(angle).lt.170.0d0)
 !
-!======================================================================!
+! Checking if cycle has rigid exocyclic bond
 !
-       logical function has_rigid_exo_bond(nat,adj,lrigid,exo,ring)
-!
-       implicit none
-!
-       logical,dimension(nat,nat),intent(in) ::  adj     !
-       logical,dimension(nat,nat),intent(in) ::  lrigid  !
-       integer,intent(in)                    ::  nat     !
-       integer,intent(in)        ::  exo   !
-       integer,intent(in)        ::  ring  !
-       integer                   ::  j     !
-!
-       has_rigid_exo_bond = .FALSE.
+       exobond = .FALSE.
 !
        do j = 1, nat
          if ( j .eq. ring ) cycle
          if ( adj(exo,j) .and. lrigid(exo,j) ) then
-           has_rigid_exo_bond = .TRUE.
-           return
+! A rigid bond to the non-ring substituent is a second indicator of sp2-like
+! conjugation even if the angular planarity test is marginal.
+!
+           exobond = .TRUE.
+           exit
          end if
        end do
 !
+! Checking if exocyclic atom has sp2 hybridization
+!
+       lsp2exo = lplanardeg3 .or. exobond
+!
        return
-       end function has_rigid_exo_bond
+       end function lsp2exo
 !
 !======================================================================!
 !
-       logical function is_valid_degree2_exocyclic(nat,adj,ideg,exo,ring)
+       logical function ldeg2exo(nat,adj,ideg,exo,ring)
 !
        implicit none
 !
-       logical,dimension(nat,nat),intent(in)    ::  adj     !
-       integer,dimension(nat),intent(in)        ::  ideg    !
-       integer,intent(in)                       ::  nat     !
-       integer,intent(in)             ::  exo    !
-       integer,intent(in)             ::  ring   !
+! Input/Output variables
 !
-       integer                        ::  other  !
+       logical,dimension(nat,nat),intent(in)  ::  adj    !
+       integer,dimension(nat),intent(in)      ::  ideg   !
+       integer,intent(in)                     ::  nat    !
+       integer,intent(in)                     ::  exo    !
+       integer,intent(in)                     ::  ring   !
 !
-       is_valid_degree2_exocyclic = .FALSE.
+! Local variables
+!
+       integer                                ::  other  !
+       integer                                ::  j      !
+!
+!
+!
+       ldeg2exo = .FALSE.
 !
        if ( ideg(exo) .ne. 2 ) return
 !
-       other = other_exocyclic_neighbor(nat,adj,exo,ring)
-       if ( other .lt. 1 ) return
+       other = -1
 !
-!
-!      For degree-2 ring-exocyclic bonds the cis/trans selection is decided
-!      by select_ring_exocyclic itself.  Reaching this point only states that
-!      the exocyclic atom has exactly one additional neighbour.
-!
-       is_valid_degree2_exocyclic = .TRUE.
-!
-       return
-       end function is_valid_degree2_exocyclic
-!
-!======================================================================!
-!
-       integer function other_exocyclic_neighbor(nat,adj,exo,ring)
-!
-       implicit none
-!
-       logical,dimension(nat,nat),intent(in) ::  adj    !
-       integer,intent(in)                    ::  nat    !
-       integer,intent(in)        ::  exo   !
-       integer,intent(in)        ::  ring  !
-       integer                   ::  j     !
-!
-       other_exocyclic_neighbor = -1
+! For a degree-2 exocyclic center, require exactly one additional neighbour
+! besides the ring atom.  The chemical identity of that neighbour is not fixed.
 !
        do j = 1, nat
          if ( j .eq. ring ) cycle
          if ( adj(exo,j) ) then
-           other_exocyclic_neighbor = j
-           return
+           other = j
+           exit
          end if
        end do
 !
+       if ( other .lt. 1 ) return
+!
+! For degree-2 ring-exocyclic bonds the cis/trans selection is decided
+!  by selringexo itself.  Reaching this point only states that
+!  the exocyclic atom has exactly one additional neighbour.
+!
+       ldeg2exo = .TRUE.
+!
        return
-       end function other_exocyclic_neighbor
+       end function ldeg2exo
 !
 !======================================================================!
 !

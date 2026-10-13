@@ -1,11 +1,11 @@
 !======================================================================!
 !
-       program gen_FF 
+       program gen_FF
 !
        use timings
        use lengths,       only:  leninp,lenout,lentag,lenlab,lenarg
        use units,         only:  uniinp,unideps,unitmp,uniscr,unitop
-                                 
+
 !
        use datatypes
 !
@@ -31,20 +31,25 @@
        character(len=lenlab)                           ::  resname  !
        real(kind=8)                                    ::  fsig     !
        real(kind=8)                                    ::  feps     !
-       integer                                         ::  nmol     !  
+       integer                                         ::  nmol     !
+!
+! Algorithmic routes options
+!
        integer                                         ::  knei     !  Maximum distance from source node
-       integer                                         ::  iroute   !  
-       logical                                         ::  fring    !  
-       logical                                         ::  fhetero  !  
-       logical                                         ::  fdouble  !  
-       logical                                         ::  fnitrogen !  
-       logical                                         ::  fadhocdihedeps !
+       integer                                         ::  iroute   !
+       logical                                         ::  fring    !
+       logical                                         ::  fhetero  !
+       logical                                         ::  fdouble  !
+       logical                                         ::  fnitro   !
+       logical                                         ::  fadhoc   !
        logical                                         ::  fideal   !
        logical                                         ::  fquad    !
        logical                                         ::  fsymm    !
        logical                                         ::  fpairs   !
        logical                                         ::  fexcl    !
        logical                                         ::  debug    !
+!
+! File names
 !
        character(len=leninp)                           ::  geo      !
        character(len=leninp)                           ::  xyz      !
@@ -55,10 +60,15 @@
        character(len=lentag)                           ::  ext      !
        character(len=lentag)                           ::  topext   !
        character(len=lentag)                           ::  formt    !  QC  output format
+!
+! Files flags
+!
        logical                                         ::  fqmout   !
        logical                                         ::  fqmdir   !
        logical                                         ::  fqmscan  !
        logical                                         ::  fstep2   !
+!
+! QC calculation information
 !
        character(len=20)                               ::  meth     !
        character(len=20)                               ::  basis    !
@@ -66,8 +76,12 @@
        integer                                         ::  chrg     !
        integer                                         ::  mult     !
 !
+! Relaxed scan information
+!
        real(kind=8)                                    ::  step     !
        integer                                         ::  nstep    !
+!
+! Molecule information
 !
        real(kind=8),dimension(:,:),allocatable         ::  coord    !  Atomic coordinates
        real(kind=8),dimension(:),allocatable           ::  mass     !  Atomic masses
@@ -76,7 +90,7 @@
        integer                                         ::  nat      !  Number of atoms
 !
 ! Graph properties
-!       
+!
        real(kind=8),dimension(:,:),allocatable         ::  wiberg   !  Wiberg bond index matrix
        integer,dimension(:,:),allocatable              ::  mindis   !  Minimum distance matrix
        integer,dimension(:,:),allocatable              ::  cycles   !  Cycles information
@@ -85,8 +99,8 @@
        integer,dimension(:),allocatable                ::  ncycle   !  Number of atoms in each cycle
        integer,dimension(:),allocatable                ::  naroma   !  Number of atoms in each aromatic cycle
        integer,dimension(:),allocatable                ::  narunit  !  Number of atoms in each aromatic unit
-       integer,dimension(:),allocatable                ::  ideg     !  
-       integer,dimension(:,:),allocatable              ::  ich3     !  Methyl backbone       
+       integer,dimension(:),allocatable                ::  ideg     !
+       integer,dimension(:,:),allocatable              ::  ich3     !  Methyl backbone
        integer                                         ::  mcycle   !  Number of cycles
        integer                                         ::  maroma   !  Number of aromatic cycles
        integer                                         ::  marunit  !  Number of aromatic units
@@ -94,18 +108,18 @@
        integer                                         ::  nedge    !  Number of edges (bonds)
        logical,dimension(:,:),allocatable              ::  adj      !  Boolean adjacency matrix
        logical,dimension(:,:),allocatable              ::  lcycle   !  Bonds belonging to rings
-       logical,dimension(:,:),allocatable              ::  lrigid   !  Double/triple bonds       
-       logical,dimension(:,:),allocatable              ::  laroma   !  Double/triple bonds       
-       logical,dimension(:),allocatable                ::  lheavy   !  Heavy atom       
-       logical,dimension(:),allocatable                ::  latar    !  Aromatic atom       
-       logical,dimension(:),allocatable                ::  lch3     !  Methyl rotation       
-! 
+       logical,dimension(:,:),allocatable              ::  lrigid   !  Double/triple bonds
+       logical,dimension(:,:),allocatable              ::  laroma   !  Double/triple bonds
+       logical,dimension(:),allocatable                ::  lheavy   !  Heavy atom
+       logical,dimension(:),allocatable                ::  latar    !  Aromatic atom
+       logical,dimension(:),allocatable                ::  lch3     !  Methyl rotation
+!
 ! Topology information
 !
         type(grotop)                                   ::  reftop   !  New topology
         type(grotop)                                   ::  top      !  New topology
         type(dihedrals)                                ::  dihe     !  Dihedrals
-! 
+!
 ! Atom types information
 !
        character(len=lenlab),dimension(:),allocatable  ::  newlab   !  New atom type name
@@ -122,8 +136,8 @@
        character(len=lenout)                           ::  cname    !
        character(len=30)                               ::  cnum     !
        logical                                         ::  match    !
-       integer                                         ::  lin      !  
-       integer                                         ::  lfin     ! 
+       integer                                         ::  lin      !
+       integer                                         ::  lfin     !
        integer                                         ::  io       !  Status
        integer                                         ::  i,j,k    !  Indexes
 !
@@ -145,23 +159,32 @@
 ! Initializing timings
 !
        call system_clock(count_max=count_max,count_rate=count_rate)
-       call system_clock(t1)  
+       call system_clock(t1)
 !
        tcpu  = 0.0d0
 !
 ! Reading command line options
 !
+! Parse the workflow in one place: input/output files, QM defaults, topology
+! generation switches, Joyce dependency policy, and equilibrium-value policy.
+!
        call command_line(inp,ref,intop,topout,qmout,qmdir,knei,        &
                          iroute,formt,meth,basis,disp,chrg,mult,step,  &
                          nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
-                         fpairs,fexcl,fquad,fring,fhetero,fdouble,      &
-                         fnitrogen,fadhocdihedeps,fideal,debug)
+                         fpairs,fexcl,fquad,fring,fhetero,fdouble,     &
+                         fnitro,fadhoc,fideal,debug)
 !
 ! Checking qmdir definition
+!
+! qmdir is the canonical QM-data directory.  Later code assumes Gaussian/ORCA
+! outputs and generated scan inputs are addressed relative to this directory.
 !
        if ( len_trim(qmdir) .eq. 0 ) qmdir = '../QMData'
 !
 ! Check whether qmout includes a directory path
+!
+! Accept both "-qc file.log -dir QMData" and "-qc QMData/file.log" by
+! normalizing the latter into qmdir + qmout.
 !
        io = scan(qmout,'/',back=.TRUE.)
        if ( (len_trim(qmout) .gt. 0) .and.                             &
@@ -175,22 +198,26 @@
        if ( qmdir(io:io) .ne. '/' ) qmdir = trim(qmdir)//'/'
 !
 ! Create qmdir if necessary
+!
+! Step0 may start from an XYZ file only.  In that route the QM-data directory
+! may not exist yet, so create it before writing OPT+FREQ input files.
+!
        inquire(file=trim(qmdir),exist=fqmdir)
 !
        if ( .not. fqmdir  ) then
 !
-         call execute_command_line('mkdir -p '//trim(qmdir),wait=.TRUE., &
-                                   exitstat=io)
+         call execute_command_line('mkdir -p '//trim(qmdir),           &
+                                   wait=.TRUE.,exitstat=io)
 !
          if ( io .ne. 0 ) then
-           write(*,*)
-           write(*,'(2X,68("="))')
-           write(*,'(3X,A)') 'ERROR:  Could not create QM data directory'
-           write(*,*)
-           write(*,'(3X,A)') 'Directory : '//trim(qmdir)
-           write(*,'(2X,68("="))')
-           write(*,*)
-           call print_end()
+          write(*,*)
+          write(*,'(2X,68("="))')
+          write(*,'(3X,A)') 'ERROR:  Could not create QM data directory'
+          write(*,*)
+          write(*,'(3X,A)') 'Directory : '//trim(qmdir)
+          write(*,'(2X,68("="))')
+          write(*,*)
+          call print_end()
          end if
        end if
 !
@@ -220,6 +247,9 @@
 !
 ! Extracting basename from input file name
 !
+! The basename is reused for all generated artefacts: topology, Joyce input,
+! Gaussian OPT+FREQ input, and relaxed scan files.
+!
        if ( SCAN(inp,'.',BACK=.TRUE.) .ne. 0 ) then
          bas = inp(:SCAN(inp,'.',BACK=.TRUE.)-1)
          ext = inp(SCAN(inp,'.',BACK=.TRUE.)+1:)
@@ -230,13 +260,16 @@
 !
 ! Cleaning basename
 !
+! Gaussian OPT+FREQ outputs are named <basename>_of.*.  If such a file is
+! supplied directly, recover the molecular basename to avoid duplicated suffixes.
+!
        if ( bas(len_trim(bas)-2:) .eq. '_of' ) then
          bas = bas(:len_trim(bas)-3)
        end if
 !
        xyz = trim(bas)//'.xyz'
 !
-! Extracting topology basename from topology input file name  
+! Extracting topology basename from topology input file name
 !
        if ( len_trim(topout) .gt. 0 ) then
 !
@@ -259,8 +292,11 @@
        topout  = trim(topbas)//'.top'
        topnb   = trim(topbas)//'_nb.top'
        topcorr = trim(topbas)//'_template.top'
-! 
+!
 ! Checking if QC output is present in current file
+!
+! fqmout selects the main route: without QM output only a QM input is generated;
+! with QM output the program can build a force field and Joyce inputs.
 !
        if ( len_trim(qmout) .gt. 0 ) then
 !
@@ -289,7 +325,7 @@
          write(*,'(3X,A)') 'Force field will be generated from QM information'
          write(*,'(3X,A)') 'QC output name : '//trim(qmout)
          write(*,'(2X,68("*"))')
-         write(*,*)  
+         write(*,*)
        end if
 !
 ! Checking if a reference topology is provided
@@ -298,10 +334,13 @@
 !
          call read_top(reftop,itype,intop,uniinp)
 !
+! Nonbonded parameters copied from a reference topology can be scaled from the
+! command line.  This scaling does not change the bonded functional form.
+!
          reftop%attype%sig(:) = reftop%attype%sig(:)*fsig
          reftop%attype%eps(:) = reftop%attype%eps(:)*feps
 !
-         nat = reftop%nat       
+         nat = reftop%nat
 !
 ! A reference topology has priority for the bonded functional form.  Read
 ! these sections as soon as the topology is available so they can define the
@@ -312,18 +351,18 @@
          call read_angle(reftop%bonded,intop,uniinp)
          call read_dihe(reftop%bonded,intop,uniinp)
 !
-       else if ( .NOT. fqmout ) then 
+       else if ( .NOT. fqmout ) then
 !
 ! If only coordinates file is provided then generate QC input
 !
          write(*,'(2X,68("*"))')
          write(*,'(3X,A)') 'NOTE: XYZ Files only contain coordinat'//  &
                                                         'es information'
-         write(*,*) 
+         write(*,*)
          write(*,'(3X,A)') '      Generating QC input in format '//    &
                                                              trim(formt)
          write(*,'(2X,68("*"))')
-         write(*,*) 
+         write(*,*)
 !
          open(unit=uniinp,file=trim(xyz),action='read',status='old',   &
               iostat=io)
@@ -350,20 +389,15 @@
 !
        end if
 !
-! Extracting molecular information
-! 
-       if ( .NOT. fqmout ) then 
-!
-! If only initial topology is provided then extract FF information
-!
-!~          call read_pairs(reftop%nonbonded,intop,uniinp)
-!~          call read_excls(reftop%nonbonded,intop,uniinp)
-!
-       else
-!
 ! If QM output is provided then extract molecular information
 !
+       if ( fqmout ) then
+!
          cname =  trim(qmdir)//trim(qmout)
+!
+! The QM output provides geometry, atom labels, masses, atomic numbers and the
+! Wiberg matrix.  These are still needed when a reference topology supplies the
+! bonded functional form.
 !
          call chk_qmout(cname,formt) ! TODO: read orca output
 !
@@ -384,7 +418,7 @@
 !  Reading Wiberg bond index matrix  ! TODO: only supports gaussian QC output
 !
          cname =  trim(qmdir)//trim(qmout)
-         call readwiberg(cname,nat,wiberg)  
+         call readwiberg(cname,nat,wiberg)
 !
        end if
 !
@@ -405,11 +439,11 @@
 !
 ! Reading geometry and initial labels
 !
-         do i = 1, nat  
+         do i = 1, nat
            read(uniinp,*) lab(i),coord(:,i)  !  TODO: check inconsistency between reference input and qm output
          end do
 !
-         close(uniinp) 
+         close(uniinp)
        end if
 !
 ! Allocating general variables
@@ -424,6 +458,9 @@
        if ( len_trim(intop) .gt. 0 ) then
 !
 ! If an input topology is provided then use its bonds as the molecular graph
+!
+! This makes the reference topology authoritative for connectivity.  It avoids
+! silently changing the graph when Wiberg-based bond detection disagrees.
 !
          call bonds2adj(reftop%bonded%nbond,reftop%bonded%ibond,nat,adj)
 !
@@ -442,10 +479,13 @@
        end if
 !
 ! Computing graph properties
-! -------------------------- 
+! --------------------------
+!
+! These graph quantities feed atom typing, ring/aromatic detection, rigid-vs-
+! flexible dihedral classification, and dependency generation.
 !
 ! Generating list with heavy atoms
-! 
+!
        call genheavylist(nat,mass,lheavy)
 !
 !   Computing degrees
@@ -460,11 +500,11 @@
        end do
        nedge = nedge/2
 !
-       rank = nedge - nat + 1 
+       rank = nedge - nat + 1
 !
-       allocate(cycles(rank,nat),ncycle(rank)) 
-       allocate(aroma(rank,nat),naroma(rank)) 
-       allocate(arunit(rank,nat),narunit(rank)) 
+       allocate(cycles(rank,nat),ncycle(rank))
+       allocate(aroma(rank,nat),naroma(rank))
+       allocate(arunit(rank,nat),narunit(rank))
 !
 !  Cycles identification
 !
@@ -481,7 +521,7 @@
          write(*,*)
        end if
 !
-!  Computing minimum distance matrix  
+!  Computing minimum distance matrix
 !
        call dijkunwundir(nat,adj,mindis)
 !
@@ -504,18 +544,24 @@
                                            ' Equivalent Atoms algorithm'
          write(*,'(2X,68("="))')
          write(*,*)
-       end if  
+       end if
 !
        if ( fqmout ) then
 !
 !  Generating cyclelist with bonds belonging to cycles
 !
+! Ring membership prevents cyclic torsions from being treated as ordinary
+! rotatable bonds and is also used by aromatic ad hoc dependencies.
+!
          call gencyclelist(nat,rank,adj,mcycle,ncycle,cycles,lcycle)
 !
 !  Generating rigidlist with rigid bonds
 !
+! Rigid bonds are inferred from Wiberg/geometry data.  They define which
+! dihedrals are stiff, OOP-like, inversion-like, or flexible scan coordinates.
+!
          call genrigidlist(nat,rank,wiberg,coord,znum,cycles,ncycle,   &
-                           mcycle,lcycle,lrigid,laroma,latar) 
+                           mcycle,lcycle,lrigid,laroma,latar)
 !
 ! Generating representation of aromatic cycles
 !
@@ -545,9 +591,12 @@
 !
 ! Setting initial partitions  ! TODO: incorporate isotopes information through mass
 ! --------------------------
-!             
+!
+! Start from element/input-label partitions.  The atom-typing algorithm below
+! refines these labels into final force-field atom types.
+!
 !~        if ( len_trim(intop) .eq. 0 )  then
-         call strnormlabels(nat,lab,ilab,nlab)         
+         call strnormlabels(nat,lab,ilab,nlab)
          if (.NOT.allocated(itype)) allocate(itype(nat))
          itype(:) = ilab(:)
 !~        else
@@ -562,11 +611,17 @@
 !
 ! Chemically equivalent atoms strategy
 !
-         call eqvatms(nat,adj,ilab,nlab,eqv)  
+! Use full-graph equivalence.  This is the most global atom-typing route and
+! distinguishes atoms whenever their complete molecular environments differ.
+!
+         call eqvatms(nat,adj,ilab,nlab,eqv)
 !
        else
 !
 ! k-Nearest neighbors algorithm
+!
+! Use only the local environment up to knei bonds.  This deliberately merges
+! atoms whose differences appear only farther away in the graph.
 !
          call nearnei(nat,adj,eqv,nlab,ilab,knei,mindis,               &
                       rank,mcycle,ncycle,cycles,debug)
@@ -591,7 +646,7 @@
                 top%atom%atnr(nat),top%atom%resnr(nat),                &
                 top%atom%itype(nat))
 !
-! If input topology is specified take information from there 
+! If input topology is specified take information from there
 !  (command line options have priority)
 !
        if ( len_trim(intop) .gt. 0 ) then
@@ -609,13 +664,13 @@
 !
          if ( trim(sysname) .eq. '[none]' ) then
            top%mol%sysname = reftop%mol%sysname
-         else 
+         else
            top%mol%sysname = sysname
          end if
 !
          if ( nmol .eq. -1 ) then
            top%mol%nmol = reftop%mol%nmol
-         else 
+         else
            top%mol%nmol = nmol
          end if
 !
@@ -631,13 +686,16 @@
          if ( nmol .eq. -1 ) then
            top%mol%nmol = 1
            nmol         = 1
-         else 
+         else
            top%mol%nmol = nmol
          end if
 !
        end if
 !
 ! Generating new atomtypes section
+!
+! Build [ atomtypes ] from the refined labels.  With a reference topology,
+! nonbonded parameters are copied from each atom's original reference type.
 !
        top%attype%ntype     = nidat
        top%attype%ptype(:)  = 'A'
@@ -664,7 +722,7 @@
            top%atom%itype(i) = k
 !
            top%attype%atname(k) = newlab(i)
-           top%attype%bond(k)   = newlab(i) 
+           top%attype%bond(k)   = newlab(i)
 !
            if ( len_trim(intop) .gt. 0 ) then
              top%attype%ptype(k)  = reftop%attype%ptype(itype(i))
@@ -681,6 +739,10 @@
        itype(:) = top%atom%itype(:)
 !
 ! Generating new atoms section
+!
+! Preserve reference [ atoms ] metadata when present, but replace the atom-type
+! column with the newly generated labels.  This keeps charges/residue data while
+! allowing gen_FF to define the type names.
 !
        top%atom%nat = nat
 !
@@ -705,17 +767,24 @@
 !
        if ( (fqmout) .and. (len_trim(intop) .eq. 0) ) then
 !
-         call genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,lcycle,lrigid, &
-                          laroma,latar,lch3,ich3,znum,top%bonded,dihe, &
-                          iroute,fring,fhetero,fdouble,fnitrogen,      &
-                          fideal,debug)
+! Pure-QM route: infer the full bonded functional form from the QM-derived
+! graph, Wiberg matrix, geometry, ring information and atom types.
+!
+         call genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,        &
+                          lcycle,lrigid,laroma,latar,lch3,ich3,znum,   &
+                          top%bonded,dihe,iroute,fring,fhetero,        &
+                          fdouble,fnitro,fideal,debug)
 !
        else
+!
+! Reference-topology route: keep the user-supplied [ bonds ], [ angles ] and
+! [ dihedrals ] sections, then translate them into internal dihedral data for
+! scans, Joyce inputs and dependencies.
 !
          allocate(top%bonded%bond(reftop%bonded%nbond),                &
                   top%bonded%kbond(reftop%bonded%nbond),               &
                   top%bonded%fbond(reftop%bonded%nbond),               &
-                  top%bonded%ibond(2,reftop%bonded%nbond))     
+                  top%bonded%ibond(2,reftop%bonded%nbond))
 !
          allocate(top%bonded%ang(reftop%bonded%nang),                  &
                   top%bonded%kang(reftop%bonded%nang),                 &
@@ -735,7 +804,7 @@
                   top%bonded%c4(reftop%bonded%ndihe),                  &
                   top%bonded%c5(reftop%bonded%ndihe))
 !
-         top%bonded = reftop%bonded 
+         top%bonded = reftop%bonded
 !
          call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
@@ -751,10 +820,16 @@
 !
 ! TODO: check if equilibrium distances should be taken from external geometry
 !
+
+!
        end if
 !
 ! Finding unique cuadruplets
 ! --------------------------
+!
+! In the pure-QM route, redundant scan representatives can be screened and
+! compacted.  When -p is supplied, the user-provided functional form must not
+! be changed by these filters.
 !
        if ( (fquad) .and. (len_trim(intop) .eq. 0) )                  &
          call screenquad(dihe,dihe%nflexi,lch3,ich3,dihe%ndihe,nat,idat)
@@ -763,6 +838,10 @@
          call selectquad(nat,dihe%nquad,dihe,idat,nidat,debug)
 !
        fstep2 = .TRUE.
+!
+! A Joyce Step2 input can be printed only after every relaxed-scan Gaussian
+! output is present.  Missing scans are generated as Gaussian input files and
+! Step2 is postponed.
 !
        do i = 1, dihe%nquad
 !
@@ -785,6 +864,10 @@
 ! Symmetrizing force field terms
 ! ------------------------------
 !
+! symffbonded writes Joyce dependency suggestions.  The fsymm flag controls
+! Joyce keepff ranges; it must not average equilibrium values or force
+! constants already stored in the topology.
+!
        open(unit=unideps,file=trim(bas)//'_suggdeps.txt',action='write')
        open(unit=unitmp,status='scratch')
        open(unit=uniscr,status='scratch')
@@ -793,8 +876,8 @@
 !
        call symffbonded(nat,nidat,idat,newlab,top%bonded,dihe,rank,    &
                         marunit,narunit,arunit,lheavy,adj,fsymm,       &
-                        fadhocdihedeps,debug)
-                        
+                        fadhoc,debug)
+
 !
        write(unideps,'(A)') '$end'
 !
@@ -813,6 +896,9 @@
 !
 ! Printing JOYCE input files
 ! --------------------------
+!
+! Joyce Step1 fits stiff coordinates.  Joyce Step2 is written only when soft
+! torsions exist and all scan outputs are available.
 !
        call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
                         fpairs,fsymm)
@@ -907,7 +993,7 @@
            end do
            write(*,*)
          end if
-!        
+!
        end if
 !
 ! Deallocating memory
@@ -985,7 +1071,7 @@
 ! Deallocating local variables
 !
 !       deallocate(itype)
-! 
+!
 !~        if ( fqmout ) then
 !~          deallocate(mass,znum)
 !~          deallocate(wiberg,lcycle,lrigid)
@@ -1009,23 +1095,23 @@
        write(*,'(1X,A,3(X,I2,X,A))') 'Total CPU time        ',         &
                                       int(tcpu/(60*60)),'hours',       &
                                       mod(int(tcpu/60),60),'minutes',  &
-                                      mod(int(tcpu),60),'seconds'  
+                                      mod(int(tcpu),60),'seconds'
        write(*,*)
 !
-! Printing finishing date 
-!    
+! Printing finishing date
+!
        call print_end()
 !
-       end program gen_FF 
+       end program gen_FF
 !
 !======================================================================!
 !
        subroutine command_line(inp,ref,top,topout,qmout,qmdir,knei,    &
-                               iroute,formt,meth,basis,disp,chrg,mult, & 
+                               iroute,formt,meth,basis,disp,chrg,mult, &
                                step,nstep,sysname,resname,nmol,fsig,   &
                                feps,fsymm,fpairs,fexcl,fquad,fring,    &
-                               fhetero,fdouble,fnitrogen,fadhocdihedeps,&
-                               fideal,debug)
+                               fhetero,fdouble,fnitro,fadhoc,fideal,   &
+                               debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -1039,7 +1125,7 @@
        character(len=leninp),intent(out)  ::  top      !  Topology file name
        character(len=leninp),intent(out)  ::  topout   !  Output topology file name
        character(len=leninp),intent(out)  ::  qmout    !  QC input file name
-       character(len=leninp),intent(out)  ::  qmdir    !  
+       character(len=leninp),intent(out)  ::  qmdir    !
        character(len=leninp),intent(out)  ::  ref      !  Reference xyz file name
        character(len=lentag),intent(out)  ::  formt    !
        character(len=lenarg),intent(out)  ::  sysname  !
@@ -1047,26 +1133,26 @@
        real(kind=8),intent(out)           ::  step     !
        real(kind=8),intent(out)           ::  fsig     !
        real(kind=8),intent(out)           ::  feps     !
-       integer,intent(out)                ::  nstep    !  
-       integer,intent(out)                ::  nmol     !  
-       integer,intent(out)                ::  knei     !  
-       integer,intent(out)                ::  iroute   !  
-       logical,intent(out)                ::  fquad    !  
-       logical,intent(out)                ::  fsymm    !  
-       logical,intent(out)                ::  fpairs   !  
-       logical,intent(out)                ::  fexcl    !  
-       logical,intent(out)                ::  fring    !  
-       logical,intent(out)                ::  fhetero  !  
-       logical,intent(out)                ::  fdouble  !  
-       logical,intent(out)                ::  fnitrogen !  
-       logical,intent(out)                ::  fadhocdihedeps !
+       integer,intent(out)                ::  nstep    !
+       integer,intent(out)                ::  nmol     !
+       integer,intent(out)                ::  knei     !
+       integer,intent(out)                ::  iroute   !
+       logical,intent(out)                ::  fquad    !
+       logical,intent(out)                ::  fsymm    !
+       logical,intent(out)                ::  fpairs   !
+       logical,intent(out)                ::  fexcl    !
+       logical,intent(out)                ::  fring    !
+       logical,intent(out)                ::  fhetero  !
+       logical,intent(out)                ::  fdouble  !
+       logical,intent(out)                ::  fnitro   !
+       logical,intent(out)                ::  fadhoc   !
        logical,intent(out)                ::  fideal   !
 !
        character(len=20),intent(out)      ::  meth     !
        character(len=20),intent(out)      ::  basis    !
        character(len=30),intent(out)      ::  disp     !
        integer,intent(out)                ::  chrg     !
-       integer,intent(out)                ::  mult     !       
+       integer,intent(out)                ::  mult     !
 !
        logical,intent(out)                ::  debug    !  Debug mode
 !
@@ -1093,13 +1179,13 @@
        knei   = -1
        fquad  = .TRUE.
 !
-       iroute = 1
+       iroute  = 1
        fring   = .TRUE.
        fhetero = .TRUE.
        fdouble = .TRUE.
-       fnitrogen = .FALSE.
-       fadhocdihedeps = .TRUE.
-       fideal = .TRUE.
+       fnitro  = .FALSE.
+       fadhoc  = .TRUE.
+       fideal  = .TRUE.
 !
        formt  = 'g16'
        step  = 15.0
@@ -1289,19 +1375,19 @@
              fdouble = .FALSE.
 !
            case ('-oop-nitrogen','--oop-nitrogen','--star-nitrogen')
-             fnitrogen = .TRUE.
+             fnitro = .TRUE.
 !
-           case ('-nooop-nitrogen','--nooop-nitrogen',                &
+           case ('-nooop-nitrogen','--nooop-nitrogen',                 &
                  '--nostar-nitrogen')
-             fnitrogen = .FALSE.
+             fnitro = .FALSE.
 !
            case ('-adhoc-deps','--adhoc-deps',                         &
                  '-adhoc-dihedral-deps','--adhoc-dihedral-deps')
-             fadhocdihedeps = .TRUE.
+             fadhoc = .TRUE.
 !
            case ('-noadhoc-deps','--noadhoc-deps',                     &
                  '-noadhoc-dihedral-deps','--noadhoc-dihedral-deps')
-             fadhocdihedeps = .FALSE.
+             fadhoc = .FALSE.
 !
            case ('-ideal','-idealval','--ideal','--idealval',          &
                  '--ideal-values','--ideal-equilibrium')
@@ -1337,7 +1423,8 @@
            case ('-excl','-exclusions','--exclusions')
              fexcl = .TRUE.
 !
-           case ('-noexcl','-noexclusions','--no-exclusions','--noexclusions')
+           case ('-noexcl','-noexclusions','--no-exclusions',          &
+                                                       '--noexclusions')
              fexcl = .FALSE.
 !
            case ('-v','--debug','--verbose')
@@ -1387,25 +1474,25 @@
                                                        'romacs topology'
        write(*,'(2X,A)') '-p,--input-topology          Input Groma'//  &
                                                            'cs topology'
-       write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  & 
+       write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  &
                                                           'acs topology'
-       write(*,*) 
+       write(*,*)
        write(*,'(A)') 'QC DATA FILES'
        write(*,'(2X,A)') '-qc,--qmout                  QC input file name'
        write(*,'(2X,A)') '-dir,--qmdir                 QC data directory'
-       write(*,*) 
+       write(*,*)
        write(*,'(A)') 'SYSTEM INFORMATION'
-       write(*,'(2X,A)') '-sysname,--system-name       System name'  
-       write(*,'(2X,A)') '-resname,--residue-name      Molecule name'  
+       write(*,'(2X,A)') '-sysname,--system-name       System name'
+       write(*,'(2X,A)') '-resname,--residue-name      Molecule name'
        write(*,'(2X,A)') '-nmol,--number-molecules     Number of m'//  &
-                                                'olecules in the system'  
-       write(*,*) 
+                                                'olecules in the system'
+       write(*,*)
        write(*,'(A)') 'ALGORITHM OPTIONS'
-       write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'  
-       write(*,*) 
+       write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'
+       write(*,*)
        write(*,'(A)') 'FUNCTIONAL FORM OF THE FF'
        write(*,'(2X,A)') '-[no]pquad,--[no]principal   Include onl'//  &
-                                               'y principal quadruplets'     
+                                               'y principal quadruplets'
        write(*,'(2X,A)') '--[no]star-ring              Add star li'//  &
                                            'ke dieds. in aromatic rings'
        write(*,'(2X,A)') '--[no]star-ketone            Add star li'//  &
@@ -1414,18 +1501,20 @@
                                          'ke dieds. in C=C double bonds'
        write(*,'(2X,A)') '--[no]star-nitrogen          Add star li'//  &
                                      'ke dieds. in planar conjugated N'
+       write(*,*)
+       write(*,'(A)') 'JOYCE DEPENDENCIES'
        write(*,'(2X,A)') '--[no]adhoc-deps             Add aromatic '// &
                                      'ad hoc rigid/improper dependencies'
-       write(*,*) 
+       write(*,*)
        write(*,'(A)') 'INTRAMOLEULAR NONBONDED INTERACTIONS'
        write(*,'(2X,A)') '-[no]pairs,--[no]intranb     Add pairs'
        write(*,'(2X,A)') '-[no]excl,--[no]exclusions   Add exclusions'
-       write(*,*) 
+       write(*,*)
        write(*,'(A)') 'EQUILIBRIUM VALUES'
        write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  & ! TODO: to be implemented
-                                                       'output topology'  
-       write(*,'(2X,A)') '-[no]ideal,--[no]idealval    Use ideal 0'//  &
-                                      '/180 or geometric stiff dihedrals'
+                                                       'output topology'
+       write(*,'(2X,A)') '-[no]ideal,--[no]idealval    Use ideal e'//  &
+                                                     'quilibrium values'
        write(*,*)
        write(*,'(A)') 'NONBONDED INTERACTIONS MANIPULATION'
        write(*,'(2X,A)') '-fsig,--factor-sigma         Scale sigma'//  &
@@ -1461,7 +1550,7 @@
 !
 ! GENINP - GENerate INPut
 !
-! This subroutine 
+! This subroutine
 !
        subroutine geninp(nat,lab,coord,bas,qmdir,formt,meth,basis,disp,&
                          chrg,mult)
@@ -1476,7 +1565,7 @@
        character(len=leninp),intent(in)          ::  bas     !
        character(len=leninp),intent(in)          ::  qmdir   !
        character(len=lenlab),dimension(nat)      ::  lab     !  Atomic labels
-       real(kind=8),dimension(3,nat),intent(in)  ::  coord   ! 
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord   !
        integer,intent(in)                        ::  nat     !
 !
        character(len=lentag),intent(in)          ::  formt   !
@@ -1510,7 +1599,7 @@
              cdisp = ''
            else
              cdisp = 'empiricaldispersion='//trim(disp)
-           end if 
+           end if
 !
            open(unit=uniout,file=trim(qmdir)//trim(bas)//'_of.com',    &
                 action='write')
@@ -1544,7 +1633,7 @@
 !
 ! GENSCAN - GENerate SCAN
 !
-! This subroutine 
+! This subroutine
 !
        subroutine genscan(idx,nat,lab,coord,nquad,iquad,nstep,step,    &
                           bas,qmdir,formt,meth,basis,disp,chrg,mult)
@@ -1559,8 +1648,8 @@
        character(len=leninp),intent(in)          ::  bas     !
        character(len=leninp),intent(in)          ::  qmdir   !
        character(len=lenlab),dimension(nat)      ::  lab     !  Atomic labels
-       real(kind=8),dimension(3,nat),intent(in)  ::  coord   ! 
-       real(kind=8),intent(in)                   ::  step    ! 
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord   !
+       real(kind=8),intent(in)                   ::  step    !
        integer,dimension(4,nquad),intent(in)     ::  iquad   !
        integer,intent(in)                        ::  nquad   !
        integer,intent(in)                        ::  nat     !
@@ -1593,7 +1682,7 @@
              cdisp = ''
            else
              cdisp = 'empiricaldispersion='//trim(disp)
-           end if 
+           end if
 !
            open(unit=uniout,file=trim(qmdir)//trim(bas)//'.com',       &
                 action='write')
@@ -1617,7 +1706,7 @@
            write(uniout,*)
 !
            close(uniout)
-!     
+!
        end select
 !
        return
@@ -1627,7 +1716,7 @@
 !
 ! GENNBINP - GENerate NonBonded INPut
 !
-! This subroutine 
+! This subroutine
 !
        subroutine gennbinp(nat,lab,coord,bas,top,formt,chrg,mult)
 !
@@ -1641,7 +1730,7 @@
        character(len=leninp),intent(in)          ::  bas     !
        character(len=leninp),intent(in)          ::  top     !
        character(len=lenlab),dimension(nat)      ::  lab     !  Atomic labels
-       real(kind=8),dimension(3,nat),intent(in)  ::  coord   ! 
+       real(kind=8),dimension(3,nat),intent(in)  ::  coord   !
        integer,intent(in)                        ::  nat     !
 !
        character(len=lentag),intent(in)          ::  formt   !
@@ -1735,9 +1824,9 @@
        line = adjustl(line)
 !
        if ( trim(line) .eq. 'Entering Gaussian System' ) then
-         lab = 'g16'  
-         close(uniinp)  
-         return    
+         lab = 'g16'
+         close(uniinp)
+         return
        end if
 !
 ! Checking if QM output comes from a ORCA calculation
@@ -1759,8 +1848,8 @@
 !
        if ( trim(line) .eq. '* O   R   C   A *' ) then
          lab = 'orca'
-         close(uniinp)  
-         return    
+         close(uniinp)
+         return
        end if
 !
 ! Error check
@@ -1773,7 +1862,7 @@
                                                   ' unknown QM software'
        write(*,'(2X,68("="))')
        write(*,*)
-       call print_end()       
+       call print_end()
 !
        return
        end subroutine chk_qmout
@@ -1782,7 +1871,7 @@
 !
 ! PRINT_STEP1 - PRINT input STEP 1
 !
-! This subroutine 
+! This subroutine
 !
        subroutine print_step1(bas,top,qmout,qmdir,nstiff,fpairs,fsymm)
 !
@@ -1807,7 +1896,7 @@
        character(len=lenline)                    ::  line    !
        integer                                   ::  io      !
 !
-! Generating Joyce3 input (step1) 
+! Generating Joyce3 input (step1)
 ! -------------------------------
 !
        qmfile = adjustl(qmout)
@@ -1820,14 +1909,14 @@
        write(unijoyce,'(A)') '$forcefield gromacs '//trim(top)
        write(unijoyce,'(A)') '$zero 1.d-12'
        write(unijoyce,'(A)') '$whess 5000. 2500.0'
-       write(unijoyce,*) 
+       write(unijoyce,*)
        if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
-       if ( fpairs ) write(unijoyce,*) 
-       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         & 
+       if ( fpairs ) write(unijoyce,*)
+       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         &
                                                           '_freqchk.agr'
-       write(unijoyce,*) 
+       write(unijoyce,*)
        if ( fsymm ) write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
-       if ( fsymm ) write(unijoyce,*) 
+       if ( fsymm ) write(unijoyce,*)
        write(unijoyce,'(A)') '$dependence 1.2'
 !
        rewind(unitmp)
@@ -1852,47 +1941,45 @@
 !
 ! PRINT_STEP1 - PRINT input STEP 2
 !
-! This subroutine 
+! This subroutine
 !
        subroutine print_step2(bas,top,qmout,qmdir,nstiff,fpairs,       &
                               fsymm,intop,bonded,dihe,nstep)
 !
-       use lengths,   only: leninp,lenline
-       use units,     only: unijoyce,uniscr,uniinp
+       use lengths,       only: leninp,lenline
+       use units,         only: unijoyce,uniscr,uniinp
 !
-       use datatypes,   only: grobonded,                               &
-                              dihedrals
-       use gromacs_files, only: read_bond, read_angle, read_dihe
+       use datatypes,     only: grobonded,                             &
+                                dihedrals
+       use gromacs_files, only: read_bond,read_angle,read_dihe
 !
        implicit none
 !
 ! Input/output variables
 !
-       type(grobonded),intent(inout)             ::  bonded  !
-       type(dihedrals),intent(inout)             ::  dihe    !
-       character(len=leninp),intent(in)          ::  bas     !
-       character(len=leninp),intent(in)          ::  top     !
-       character(len=leninp),intent(in)          ::  intop   !
-       character(len=leninp),intent(in)          ::  qmout   !
-       character(len=leninp),intent(in)          ::  qmdir   !
-       integer,intent(in)                        ::  nstep   !
-       integer,intent(in)                        ::  nstiff  !
-       logical,intent(in)                        ::  fpairs  !
-       logical,intent(in)                        ::  fsymm   !
+       type(grobonded),intent(inout)             ::  bonded     !
+       type(dihedrals),intent(inout)             ::  dihe       !
+       character(len=leninp),intent(in)          ::  bas        !
+       character(len=leninp),intent(in)          ::  top        !
+       character(len=leninp),intent(in)          ::  intop      !
+       character(len=leninp),intent(in)          ::  qmout      !
+       character(len=leninp),intent(in)          ::  qmdir      !
+       integer,intent(in)                        ::  nstep      !
+       integer,intent(in)                        ::  nstiff     !
+       logical,intent(in)                        ::  fpairs     !
+       logical,intent(in)                        ::  fsymm      !
 !
 ! Local variables
 !
-       character(len=120)                        ::  cname   !
-       character(len=10)                         ::  cnum    !
-       character(len=leninp)                     ::  qmfile  !
-       character(len=lenline)                    ::  line    !
-       type(grobonded)                           ::  refbonded !
-       integer                                   ::  io      !
-       integer                                   ::  i,j     !
-       real(kind=8),parameter                    ::              &
-                                      gromacs_to_joyce_bond_k = 0.01d0
+       character(len=120)                        ::  cname      !
+       character(len=10)                         ::  cnum       !
+       character(len=leninp)                     ::  qmfile     !
+       character(len=lenline)                    ::  line       !
+       type(grobonded)                           ::  refbonded  !
+       integer                                   ::  io         !
+       integer                                   ::  i,j        !
 !
-! Generating Joyce3 input (step1) 
+! Generating Joyce3 input (step1)
 ! -------------------------------
 !
        qmfile = adjustl(qmout)
@@ -1906,12 +1993,12 @@
        write(unijoyce,'(A)') '$zero 1.d-12'
        write(unijoyce,'(A)') '$whess 5000. 2500.0'
        if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
-       write(unijoyce,*) 
-       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         & 
+       write(unijoyce,*)
+       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         &
                                                           '_freqchk.agr'
-       write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         & 
+       write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         &
                                                           '_torschk.agr'
-       write(unijoyce,*) 
+       write(unijoyce,*)
        if ( fsymm ) then
          write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%ntor
          write(unijoyce,*)
@@ -1933,7 +2020,7 @@
        end do
 !
        write(unijoyce,'(A)') '$end'
-       write(unijoyce,*) 
+       write(unijoyce,*)
 !
 ! If reference topology is supplied print assignments
 !
@@ -1942,12 +2029,12 @@
          call read_angle(refbonded,intop,uniinp)
          call read_dihe(refbonded,intop,uniinp)
 !
-         write(unijoyce,'(A)') '$assign' 
+         write(unijoyce,'(A)') '$assign'
 !
          do i = 1, bonded%nbond
            write(unijoyce,'(I4,1X,A,1X,F20.7,5X,A)')                   &
-             bonded%sbond(i),'=',ref_bond_k(refbonded,bonded%ibond(:,i),&
-             bonded%fbond(i),bonded%kbond(i))*gromacs_to_joyce_bond_k, &
+             bonded%sbond(i),'=',ref_bond_k(refbonded,                 &
+             bonded%ibond(:,i),bonded%fbond(i),bonded%kbond(i))*0.01d0,&
              trim(bonded%labbond(i))
          end do
 !
@@ -1980,7 +2067,7 @@
          end do
 !
          write(unijoyce,'(A)') '$end'
-         write(unijoyce,*) 
+         write(unijoyce,*)
        end if
 !
 ! Printing dihedral scan information
@@ -2006,7 +2093,7 @@
        end do
 !
        write(unijoyce,'(A)') '$end'
-       write(unijoyce,*) 
+       write(unijoyce,*)
 !
 ! Printing validation files
 !
