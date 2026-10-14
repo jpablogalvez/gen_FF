@@ -26,6 +26,7 @@
        character(len=leninp)                           ::  inp      !
        character(len=leninp)                           ::  ref      !
        character(len=leninp)                           ::  intop    !
+       character(len=leninp)                           ::  stifftop !
        character(len=leninp)                           ::  topout   !
        character(len=leninp)                           ::  qmout    !
        character(len=leninp)                           ::  qmdir    !
@@ -57,6 +58,7 @@
        character(len=leninp)                           ::  xyz      !
        character(len=leninp)                           ::  topnb    !
        character(len=leninp)                           ::  topcorr  !
+       character(len=leninp)                           ::  topsrc   !
        character(len=leninp)                           ::  bas      !
        character(len=leninp)                           ::  topbas   !
        character(len=lentag)                           ::  ext      !
@@ -69,6 +71,8 @@
        logical                                         ::  fqmdir   !
        logical                                         ::  fqmscan  !
        logical                                         ::  fstep2   !
+       logical                                         ::  ftopsrc  !
+       logical                                         ::  fstiffref!
 !
 ! QC calculation information
 !
@@ -170,11 +174,32 @@
 ! Parse the workflow in one place: input/output files, QM defaults, topology
 ! generation switches, Joyce dependency policy, and equilibrium-value policy.
 !
-       call command_line(inp,ref,intop,topout,qmout,qmdir,knei,        &
-                         iroute,formt,meth,basis,disp,chrg,mult,step,  &
-                         nstep,sysname,resname,nmol,fsig,feps,fsymm,   &
-                         fpairs,fexcl,fquad,fring,fhetero,fdouble,     &
-                         fnitro,fadhoc,fideal,debug)
+       call command_line(inp,ref,intop,stifftop,topout,qmout,qmdir,    &
+                         knei,iroute,formt,meth,basis,disp,chrg,mult,  &
+                         step,nstep,sysname,resname,nmol,fsig,feps,    &
+                         fsymm,fpairs,fexcl,fquad,fring,fhetero,       &
+                         fdouble,fnitro,fadhoc,fideal,debug)
+!
+! Topology-driven routes are mutually exclusive.  -p/--input-topology keeps
+! the complete bonded functional form; --reference-stiff keeps only stiff
+! modes and lets gen_FF regenerate flexible Fourier torsions.
+!
+       if ( (len_trim(intop).gt.0) .and. (len_trim(stifftop).gt.0) ) then
+         write(*,*)
+         write(*,'(2X,68("="))')
+         write(*,'(3X,A)') 'ERROR:  Conflicting topology routes'
+         write(*,*)
+         write(*,'(3X,A)') 'Use either --input-topology or '//        &
+                           '--reference-stiff, not both.'
+         write(*,'(2X,68("="))')
+         write(*,*)
+         call print_end()
+       end if
+!
+       fstiffref = len_trim(stifftop) .gt. 0
+       ftopsrc   = (len_trim(intop) .gt. 0) .or. fstiffref
+       topsrc    = intop
+       if ( fstiffref ) topsrc = stifftop
 !
 ! Checking qmdir definition
 !
@@ -332,9 +357,9 @@
 !
 ! Checking if a reference topology is provided
 !
-       if ( len_trim(intop) .gt. 0 ) then
+       if ( ftopsrc ) then
 !
-         call read_top(reftop,itype,intop,uniinp)
+         call read_top(reftop,itype,topsrc,uniinp)
 !
 ! Nonbonded parameters copied from a reference topology can be scaled from the
 ! command line.  This scaling does not change the bonded functional form.
@@ -344,14 +369,26 @@
 !
          nat = reftop%nat
 !
-! A reference topology has priority for the bonded functional form.  Read
-! these sections as soon as the topology is available so they can define the
-! graph and the final [ bonds ], [ angles ], and [ dihedrals ] sections, even
-! when QM output is also present for geometry and Joyce data.
+! Read bonded reference sections as soon as the topology is available.  In the
+! full -p route these sections define the final bonded form.  In the
+! --reference-stiff route they define the molecular graph and later replace
+! only the stiff modes.
 !
-         call read_bond(reftop%bonded,intop,uniinp)
-         call read_angle(reftop%bonded,intop,uniinp)
-         call read_dihe(reftop%bonded,intop,uniinp)
+         call read_bond(reftop%bonded,topsrc,uniinp)
+         call read_angle(reftop%bonded,topsrc,uniinp)
+         call read_dihe(reftop%bonded,topsrc,uniinp)
+!
+         if ( fstiffref .and. (.NOT. fqmout) ) then
+           write(*,*)
+           write(*,'(2X,68("="))')
+           write(*,'(3X,A)') 'ERROR:  --reference-stiff requires QM output'
+           write(*,*)
+           write(*,'(3X,A)') 'Flexible torsions must be regenerated from '//&
+                             'QM-derived information; provide -qc/--qmout.'
+           write(*,'(2X,68("="))')
+           write(*,*)
+           call print_end()
+         end if
 !
        else if ( .NOT. fqmout ) then
 !
@@ -457,7 +494,7 @@
 ! Generation of the adjacency matrix
 ! ----------------------------------  !  TODO: check bonds are consistent with input topology
 !
-       if ( len_trim(intop) .gt. 0 ) then
+       if ( ftopsrc ) then
 !
 ! If an input topology is provided then use its bonds as the molecular graph
 !
@@ -651,7 +688,7 @@
 ! If input topology is specified take information from there
 !  (command line options have priority)
 !
-       if ( len_trim(intop) .gt. 0 ) then
+       if ( ftopsrc ) then
 !
          top%def = reftop%def ! Defaults already specified
          top%mol = reftop%mol ! Exclusions already specified (TODO: select exclusions)
@@ -726,7 +763,7 @@
            top%attype%atname(k) = newlab(i)
            top%attype%bond(k)   = newlab(i)
 !
-           if ( len_trim(intop) .gt. 0 ) then
+           if ( ftopsrc ) then
              top%attype%ptype(k)  = reftop%attype%ptype(itype(i))
              top%attype%mass(k)   = reftop%attype%mass(itype(i))
              top%attype%charge(k) = reftop%attype%charge(itype(i))
@@ -748,7 +785,7 @@
 !
        top%atom%nat = nat
 !
-       if ( len_trim(intop) .gt. 0 ) then
+       if ( ftopsrc ) then
          top%atom = reftop%atom
        else
          do i = 1, nat
@@ -776,6 +813,15 @@
                           lcycle,lrigid,laroma,latar,lch3,ich3,znum,   &
                           top%bonded,dihe,iroute,fring,fhetero,        &
                           fdouble,fnitro,fideal,debug)
+!
+         if ( fstiffref ) then
+!
+! Hybrid route: keep the generated flexible torsions/Fourier series, but
+! replace all stiff modes by the exact terms supplied in --reference-stiff.
+!
+           call replace_reference_stiff_terms(top%bonded,dihe,         &
+                                              reftop%bonded,nat,adj)
+         end if
 !
        else
 !
@@ -893,7 +939,7 @@
 ! Printing force field
 ! --------------------
 !
-       call print_top(unitop,nat,itype,mindis,top,dihe,geo,intop,      &
+       call print_top(unitop,nat,itype,mindis,top,dihe,geo,topsrc,     &
                       topout,fpairs,fexcl)
 !
 ! Printing JOYCE input files
@@ -906,7 +952,7 @@
                         fpairs,fsymm)
        if ( (dihe%nflexi.gt.0) .and. fstep2 ) then
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
-                          fsymm,intop,top%bonded,dihe,nstep)
+                          fsymm,topsrc,top%bonded,dihe,nstep)
        else if ( dihe%nflexi.gt.0 ) then
          write(*,*)
          write(*,'(2X,68("*"))')
@@ -1023,7 +1069,7 @@
 !
 ! Deallocating reference topology information
 !
-       if ( len_trim(intop) .gt. 0 ) then
+       if ( ftopsrc ) then
 !
          deallocate(reftop%attype%atname,reftop%attype%bond,           &
                     reftop%attype%ptype,reftop%attype%atnum,           &
@@ -1108,12 +1154,12 @@
 !
 !======================================================================!
 !
-       subroutine command_line(inp,ref,top,topout,qmout,qmdir,knei,    &
-                               iroute,formt,meth,basis,disp,chrg,mult, &
-                               step,nstep,sysname,resname,nmol,fsig,   &
-                               feps,fsymm,fpairs,fexcl,fquad,fring,    &
-                               fhetero,fdouble,fnitro,fadhoc,fideal,   &
-                               debug)
+       subroutine command_line(inp,ref,top,stifftop,topout,qmout,      &
+                               qmdir,knei,iroute,formt,meth,basis,     &
+                               disp,chrg,mult,step,nstep,sysname,      &
+                               resname,nmol,fsig,feps,fsymm,fpairs,   &
+                               fexcl,fquad,fring,fhetero,fdouble,      &
+                               fnitro,fadhoc,fideal,debug)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -1125,6 +1171,7 @@
 !
        character(len=leninp),intent(out)  ::  inp      !  Input file name
        character(len=leninp),intent(out)  ::  top      !  Topology file name
+       character(len=leninp),intent(out)  ::  stifftop !  Stiff reference topology
        character(len=leninp),intent(out)  ::  topout   !  Output topology file name
        character(len=leninp),intent(out)  ::  qmout    !  QC input file name
        character(len=leninp),intent(out)  ::  qmdir    !
@@ -1172,6 +1219,7 @@
        inp    = 'mol.xyz'
        ref    = ''
        top    = ''
+       stifftop = ''
        topout = ''
 !
        sysname = '[none]'
@@ -1239,6 +1287,11 @@
                  '--input-topology')
              call get_command_argument(i,top,status=io)
              call check_arg(top,io,arg,cmd)
+             i = i + 1
+!
+           case ('--reference-stiff','--stiff-topology')
+             call get_command_argument(i,stifftop,status=io)
+             call check_arg(stifftop,io,arg,cmd)
              i = i + 1
 !
            case ('-t','-top','--top','-topout','-outtop','--topout',   &
@@ -1458,6 +1511,135 @@
 !
 !======================================================================!
 !
+! REPLACE_REFERENCE_STIFF_TERMS - keep reference stiff modes only
+!
+! This routine implements the --reference-stiff hybrid route.  The ordinary
+! QM route first builds the complete force field, including regenerated
+! flexible torsions and Fourier series.  Then this routine replaces only the
+! stiff part by the exact terms read from the reference topology: bonds,
+! angles, rigid dihedrals, inversions, and impropers.  Flexible torsions remain
+! the generated ones.
+!
+       subroutine replace_reference_stiff_terms(bonded,dihe,refbonded, &
+                                                nat,adj)
+!
+       use datatypes,  only: grobonded,                                &
+                             dihedrals
+       use genfftools, only: bonded2dihe
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(grobonded),intent(inout)          ::  bonded    !
+       type(dihedrals),intent(inout)          ::  dihe      !
+       type(grobonded),intent(in)             ::  refbonded !
+       logical,dimension(nat,nat),intent(in)  ::  adj       !
+       integer,intent(in)                     ::  nat       !
+!
+! Local variables
+!
+       type(dihedrals)                        ::  refdihe   !
+!
+! Convert the reference [ dihedrals ] section to the internal dihedral
+! representation, but use only its stiff classes below.
+!
+       call bonded2dihe(refbonded%ndihe,refbonded,refdihe,nat,adj)
+!
+! Replace reference bond-stretching terms.
+!
+       if ( allocated(bonded%bond) )  deallocate(bonded%bond)
+       if ( allocated(bonded%kbond) ) deallocate(bonded%kbond)
+       if ( allocated(bonded%fbond) ) deallocate(bonded%fbond)
+       if ( allocated(bonded%ibond) ) deallocate(bonded%ibond)
+!
+       bonded%nbond = refbonded%nbond
+       allocate(bonded%bond(bonded%nbond),bonded%kbond(bonded%nbond),  &
+                bonded%fbond(bonded%nbond),bonded%ibond(2,bonded%nbond))
+       bonded%bond(:)    = refbonded%bond(:)
+       bonded%kbond(:)   = refbonded%kbond(:)
+       bonded%fbond(:)   = refbonded%fbond(:)
+       bonded%ibond(:,:) = refbonded%ibond(:,:)
+!
+! Replace reference angle-bending terms.
+!
+       if ( allocated(bonded%ang) )  deallocate(bonded%ang)
+       if ( allocated(bonded%kang) ) deallocate(bonded%kang)
+       if ( allocated(bonded%fang) ) deallocate(bonded%fang)
+       if ( allocated(bonded%iang) ) deallocate(bonded%iang)
+!
+       bonded%nang = refbonded%nang
+       allocate(bonded%ang(bonded%nang),bonded%kang(bonded%nang),      &
+                bonded%fang(bonded%nang),bonded%iang(3,bonded%nang))
+       bonded%ang(:)    = refbonded%ang(:)
+       bonded%kang(:)   = refbonded%kang(:)
+       bonded%fang(:)   = refbonded%fang(:)
+       bonded%iang(:,:) = refbonded%iang(:,:)
+!
+! Replace only stiff dihedral classes.  Keep dihe%iflexi/flexi untouched so
+! the Fourier functional form remains regenerated by the QM route.
+!
+       dihe%ndihe = max(dihe%ndihe,refdihe%ndihe)
+!
+       if ( allocated(dihe%irigid) ) deallocate(dihe%irigid)
+       if ( allocated(dihe%drigid) ) deallocate(dihe%drigid)
+       if ( allocated(dihe%krigid) ) deallocate(dihe%krigid)
+       if ( allocated(dihe%frigid) ) deallocate(dihe%frigid)
+       allocate(dihe%irigid(4,dihe%ndihe),dihe%drigid(dihe%ndihe),     &
+                dihe%krigid(dihe%ndihe),dihe%frigid(dihe%ndihe))
+       dihe%irigid(:,:) = 0
+       dihe%drigid(:)   = 0.0d0
+       dihe%krigid(:)   = 0.0d0
+       dihe%frigid(:)   = 0
+       dihe%nrigid      = refdihe%nrigid
+       if ( dihe%nrigid .gt. 0 ) then
+         dihe%irigid(:,:dihe%nrigid) = refdihe%irigid(:,:dihe%nrigid)
+         dihe%drigid(:dihe%nrigid)   = refdihe%drigid(:dihe%nrigid)
+         dihe%krigid(:dihe%nrigid)   = refdihe%krigid(:dihe%nrigid)
+         dihe%frigid(:dihe%nrigid)   = refdihe%frigid(:dihe%nrigid)
+       end if
+!
+       if ( allocated(dihe%iimpro) ) deallocate(dihe%iimpro)
+       if ( allocated(dihe%dimpro) ) deallocate(dihe%dimpro)
+       if ( allocated(dihe%kimpro) ) deallocate(dihe%kimpro)
+       if ( allocated(dihe%fimpro) ) deallocate(dihe%fimpro)
+       allocate(dihe%iimpro(4,dihe%ndihe),dihe%dimpro(dihe%ndihe),     &
+                dihe%kimpro(dihe%ndihe),dihe%fimpro(dihe%ndihe))
+       dihe%iimpro(:,:) = 0
+       dihe%dimpro(:)   = 0.0d0
+       dihe%kimpro(:)   = 0.0d0
+       dihe%fimpro(:)   = 0
+       dihe%nimpro      = refdihe%nimpro
+       if ( dihe%nimpro .gt. 0 ) then
+         dihe%iimpro(:,:dihe%nimpro) = refdihe%iimpro(:,:dihe%nimpro)
+         dihe%dimpro(:dihe%nimpro)   = refdihe%dimpro(:dihe%nimpro)
+         dihe%kimpro(:dihe%nimpro)   = refdihe%kimpro(:dihe%nimpro)
+         dihe%fimpro(:dihe%nimpro)   = refdihe%fimpro(:dihe%nimpro)
+       end if
+!
+       if ( allocated(dihe%iinv) ) deallocate(dihe%iinv)
+       if ( allocated(dihe%dinv) ) deallocate(dihe%dinv)
+       if ( allocated(dihe%kinv) ) deallocate(dihe%kinv)
+       if ( allocated(dihe%finv) ) deallocate(dihe%finv)
+       allocate(dihe%iinv(4,dihe%ndihe),dihe%dinv(dihe%ndihe),         &
+                dihe%kinv(dihe%ndihe),dihe%finv(dihe%ndihe))
+       dihe%iinv(:,:) = 0
+       dihe%dinv(:)   = 0.0d0
+       dihe%kinv(:)   = 0.0d0
+       dihe%finv(:)   = 0
+       dihe%ninv      = refdihe%ninv
+       if ( dihe%ninv .gt. 0 ) then
+         dihe%iinv(:,:dihe%ninv) = refdihe%iinv(:,:dihe%ninv)
+         dihe%dinv(:dihe%ninv)   = refdihe%dinv(:dihe%ninv)
+         dihe%kinv(:dihe%ninv)   = refdihe%kinv(:dihe%ninv)
+         dihe%finv(:dihe%ninv)   = refdihe%finv(:dihe%ninv)
+       end if
+!
+       return
+       end subroutine replace_reference_stiff_terms
+!
+!======================================================================!
+!
        subroutine print_help()  ! TODO: check names from command_line routine
 !
        implicit none
@@ -1472,10 +1654,12 @@
        write(*,'(2X,A)') '-f,--file                    Input file name'
        write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
                                                            'inates name'
-       write(*,'(2X,A)') '-r,--reference-topology      Reference G'//  & ! TODO: to be implemented
-                                                       'romacs topology'
+       write(*,'(2X,A)') '-r,--reference-coordinates   Reference '//   &
+                                                           'coordinates'
        write(*,'(2X,A)') '-p,--input-topology          Input Groma'//  &
                                                            'cs topology'
+       write(*,'(2X,A)') '--reference-stiff            Use only st'//  &
+                                      'iff modes from a Gromacs topology'
        write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  &
                                                           'acs topology'
        write(*,*)
