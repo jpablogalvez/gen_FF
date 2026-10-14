@@ -1741,8 +1741,8 @@
 ! Candidate ordering is deliberately hierarchical:
 !  1) chemical class
 !  2) adequacy of the oriented reference atom
-!  3) Wiberg bond strength 
-!  4) heavy atom over H 
+!  3) Wiberg bond strength
+!  4) heavy atom over H
 !  5) element priority
 !  6) deterministic atom-type/index signature
 !
