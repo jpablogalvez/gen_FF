@@ -1233,9 +1233,10 @@
        fring   = .TRUE.
        fhetero = .TRUE.
        fdouble = .TRUE.
-       fnitro  = .FALSE.
-       fadhoc  = .TRUE.
-       fideal  = .TRUE.
+       fnitro  = .TRUE.
+!
+       fadhoc  = .FALSE.
+       fideal  = .FALSE.
 !
        formt  = 'g16'
        step  = 15.0
