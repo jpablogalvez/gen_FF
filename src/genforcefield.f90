@@ -1138,6 +1138,7 @@
        logical                                    ::  flag      !
        logical                                    ::  laromatic !
        logical                                    ::  lcarbonyl !
+       logical                                    ::  lconjhet  !
        logical                                    ::  lalkene   !
        logical                                    ::  lnitrogen !
        logical                                    ::  lfound    !
@@ -1235,12 +1236,15 @@
 ! priority is later used to choose one representative when several equivalent
 ! OOP candidates are possible for the same atom type.
 !
+             lconjhet = ((znum(vaux(2)).eq.7)                          &
+                         .or. (znum(vaux(2)).eq.8)                     &
+                         .or. (znum(vaux(2)).eq.16))                   &
+                        .and. (lrigid(vaux(1),vaux(2))                 &
+                             .or. (wiberg(vaux(1),vaux(2)).ge. 1.20d0))
+!
              lcarbonyl = (znum(vaux(1)).eq.6)                          &
                           .and. (.NOT.lcycle(vaux(1),vaux(2)))         &
-                          .and. lrigid(vaux(1),vaux(2))                &
-                          .and. ((znum(vaux(2)).eq.7)                  &
-                                 .or. (znum(vaux(2)).eq.8)             &
-                                 .or. (znum(vaux(2)).eq.16))
+                          .and. lconjhet
 !
              lalkene = (znum(vaux(1)).eq.6)                            &
                         .and. (.NOT.lcycle(vaux(1),vaux(2)))           &
