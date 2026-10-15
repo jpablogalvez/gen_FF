@@ -1672,7 +1672,7 @@
            write(uniout,'(A)') trim(bas)//' optimization and frequ'//  &
                                                                 'encies'
            write(uniout,*)
-           write(uniout,'(I1,1X,I1)') chrg,mult
+           write(uniout,'(I2,1X,I2)') chrg,mult
            do i = 1, nat
              write(uniout,'(A5,3(1X,F12.6))') lab(i),coord(:,i)
            end do
@@ -1754,7 +1754,7 @@
            write(uniout,'(A,1X,4I4)') trim(bas)//' scanning dihedral', &
                                                             iquad(:,idx)
            write(uniout,*)
-           write(uniout,'(I1,1X,I1)') chrg,mult
+           write(uniout,'(I2,1X,I2)') chrg,mult
            do i = 1, nat
              write(uniout,'(A5,3(1X,F12.6))') lab(i),coord(:,i)
            end do
@@ -1822,7 +1822,7 @@
            write(uniout,*)
            write(uniout,'(A)') trim(bas)//' nb frequencies'
            write(uniout,*)
-           write(uniout,'(I1,1X,I1)') chrg,mult
+           write(uniout,'(I2,1X,I2)') chrg,mult
            do i = 1, nat
              write(uniout,'(A5,3(1X,F12.6))') lab(i),coord(:,i)
            end do
