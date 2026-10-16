@@ -1970,8 +1970,9 @@
        write(unijoyce,*)
        if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
        if ( fpairs ) write(unijoyce,*)
-       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         &
-                                                          '_freqchk.agr'
+!~        write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         &
+!~                                                           '_freqchk.agr'
+       write(unijoyce,'(A)') '$gracefreq  joyce.freqchk.agr'
        write(unijoyce,*)
        if ( fsymm ) write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
        if ( fsymm ) write(unijoyce,*)
@@ -2050,10 +2051,12 @@
        write(unijoyce,'(A)') '$whess 5000. 2500.0'
        if ( fpairs ) write(unijoyce,'(A)') '$LJassign'
        write(unijoyce,*)
-       write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         &
-                                                          '_freqchk.agr'
-       write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         &
-                                                          '_torschk.agr'
+!~        write(unijoyce,'(A)') '$gracefreq  joyce.'//trim(bas)//         &
+!~                                                           '_freqchk.agr'
+!~        write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         &
+!~                                                           '_torschk.agr'
+       write(unijoyce,'(A)') '$gracefreq  joyce.freqchk.agr'
+       write(unijoyce,'(A)') '$gracetors        torschk.agr'
        write(unijoyce,*)
        if ( fsymm ) then
          write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%ntor
