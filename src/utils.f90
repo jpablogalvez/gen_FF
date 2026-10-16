@@ -674,41 +674,37 @@
 !
        integer,intent(in)            ::  znum    !  Atomic number
        character(len=5),intent(out)  ::  atname  !  Atom names
-! 
 !
+! IUPAC element symbols in atomic-number order (Z = 1,...,118).
+! https://iupac.org/what-we-do/periodic-table-of-elements/
+! Only the element name is derived here: isotope masses remain input data.
 !
-       select case ( znum )
-         case ( 1 )
-           atname = 'H'
-         case ( 2 )
-           atname = 'He'
-         case ( 3 )
-           atname = 'Li'
-         case ( 4 )
-           atname = 'Be'
-         case ( 5 )
-           atname = 'B'
-         case ( 6 )
-           atname = 'C'
-         case ( 7 )
-           atname = 'N'
-         case ( 8 )
-           atname = 'O'
-         case ( 9 )
-           atname = 'F'
-         case ( 10 )
-           atname = 'Ne'
-         case ( 17 )
-           atname = 'Cl'
-         case ( 18 )
-           atname = 'Ar'
-         case ( 36 )
-           atname = 'Kr'
-         case default
-           write(*,*) znum, 'Not yet!'
-           write(*,*) 
-           call print_end()
-       end select
+       character(len=2),parameter :: symbols(118) =                  &
+         [character(len=2) ::                                        &
+          'H', 'He',                                                &
+          'Li','Be','B', 'C', 'N', 'O', 'F', 'Ne',                     &
+          'Na','Mg','Al','Si','P', 'S', 'Cl','Ar',                     &
+          'K', 'Ca','Sc','Ti','V', 'Cr','Mn','Fe','Co','Ni',            &
+          'Cu','Zn','Ga','Ge','As','Se','Br','Kr',                     &
+          'Rb','Sr','Y', 'Zr','Nb','Mo','Tc','Ru','Rh','Pd',            &
+          'Ag','Cd','In','Sn','Sb','Te','I', 'Xe',                     &
+          'Cs','Ba','La','Ce','Pr','Nd','Pm','Sm','Eu','Gd',            &
+          'Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W',             &
+          'Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po',            &
+          'At','Rn','Fr','Ra','Ac','Th','Pa','U', 'Np','Pu',            &
+          'Am','Cm','Bk','Cf','Es','Fm','Md','No','Lr','Rf',            &
+          'Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl',            &
+          'Mc','Lv','Ts','Og']
+!
+! Dummy/ghost centres are not chemical elements and must not index the table.
+!
+       if ( (znum .lt. 1) .or. (znum .gt. size(symbols)) ) then
+         write(*,'(A,I0,A)') 'ERROR: Invalid atomic number ',znum,     &
+                            ' in znum2atname; expected 1..118.'
+         error stop 1
+       end if
+!
+       atname = symbols(znum)
 !
        return
        end subroutine znum2atname

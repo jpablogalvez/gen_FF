@@ -25,12 +25,12 @@
 !
 ! Input/output variables
 !
-       character(len=leninp),intent(in)                  ::  inp    ! 
+       character(len=leninp),intent(in)                  ::  inp    !
        character(len=lenlab),dimension(nat),intent(out)  ::  lab    !  Atomic labels
        real(kind=8),dimension(3,nat),intent(out)         ::  coord  !
        real(kind=8),dimension(nat),intent(out)           ::  mass   !
-       integer,dimension(nat),intent(out)                ::  znum   !  
-       integer,intent(in)                                ::  nat    !  
+       integer,dimension(nat),intent(out)                ::  znum   !
+       integer,intent(in)                                ::  nat    !
 !
 ! Local variables
 !
@@ -91,7 +91,7 @@
        call chk_imagi(inp)
 !
        rewind(uniinp)
-! 
+!
 ! Reading number of atoms
 !
        call find_key(uniinp,'NAtoms=',line,io)
@@ -114,7 +114,7 @@
 !
 ! Input/output variables
 !
-       character(len=leninp),intent(in)  ::  inp     ! 
+       character(len=leninp),intent(in)  ::  inp     !
 !
 ! Local variables
 !
@@ -136,7 +136,7 @@
          write(*,*)
          write(*,'(4X,A)')       trim(inp)
          write(*,'(2X,68("="))')
-         write(*,*)  
+         write(*,*)
          call print_end()
        end if
 !
@@ -153,7 +153,7 @@
 !
 ! Input/output variables
 !
-       character(len=*),intent(in)  ::  inp     ! 
+       character(len=*),intent(in)  ::  inp     !
 !
 ! Local variables
 !
@@ -161,7 +161,7 @@
        integer                      ::  io      !  Input/Output status
 !
 ! Checking if the optimization therminated abnormally
-! 
+!
        call find_key(uniinp,'-- Stationary point found',line,io)
 !
        if ( io .ne. 0 ) then
@@ -175,7 +175,7 @@
          write(*,*)
          write(*,'(4X,A)')       trim(inp)
          write(*,'(2X,68("="))')
-         write(*,*)  
+         write(*,*)
          call print_end()
        end if
 !
@@ -214,7 +214,7 @@
          write(*,*)
          write(*,'(4X,A)')       trim(inp)
          write(*,'(2X,68("="))')
-         write(*,*)  
+         write(*,*)
          call print_end()
        end if
 !
@@ -225,11 +225,13 @@
 !
        subroutine read_nucinf(inp,nat,lab,znum,mass)
 !
+       use utils, only: znum2atname
+!
        implicit none
 !
 ! Input/output variables
 !
-       character(len=leninp),intent(in)                  ::  inp     ! 
+       character(len=leninp),intent(in)                  ::  inp     !
        character(len=lenlab),dimension(nat),intent(out)  ::  lab     !  Atom names
        real(kind=8),dimension(nat),intent(out)           ::  mass    !  Atomic masses
        integer,dimension(nat),intent(out)                ::  znum    !  Atomic number
@@ -245,7 +247,7 @@
 !
        integer                                           ::  ilower    !
        integer                                           ::  iupper    !
-       integer,parameter                                 ::  num = 10  ! 
+       integer,parameter                                 ::  num = 10  !
 !
 ! Reading atomic numbers
 !
@@ -265,15 +267,12 @@
 !
        znum = int(dvec)
 !
-       call find_key(uniinp,'Distance matrix (angstroms):',line,io)
-       if ( io .ne. 0 ) call print_badread(inp,'Distance matrix (a'//  &
-                                                           'ngstroms):')
-!
-       read(uniinp,*) line
+! Element labels follow AtZNuc in the original atom order. Gaussian does
+! not always print a distance matrix (e.g. diatomics), and its distances
+! were never used here. Preserve isotope masses read from AtmWgt above.
 !
        do i = 1, nat
-         read(uniinp,'(A)') line
-         read(line,*) straux,lab(i),line
+         call znum2atname(znum(i),lab(i))
        end do
 !
        return
@@ -287,7 +286,7 @@
 !
 ! Input/output variables
 !
-       character(len=*),intent(in)                ::  inp     ! 
+       character(len=*),intent(in)                ::  inp     !
        real(kind=8),dimension(3,nat),intent(out)  ::  coord   !
        integer,intent(in)                         ::  nat     !  Number of atoms
 !
@@ -311,12 +310,12 @@
 ! Input/output variables
 !
        real(kind=8),dimension(3,nat),intent(out)  ::  coord   !
-       integer,intent(in)                         ::  nat     ! 
+       integer,intent(in)                         ::  nat     !
        integer,intent(out)                        ::  iost    !  Reading status
 !
 ! Local variables
 !
-       character(len=leninp)                      ::  key     !  
+       character(len=leninp)                      ::  key     !
        character(len=lenline)                     ::  line    !  Line read
        integer                                    ::  keylen  !  Keyword length
        integer                                    ::  iat     !
@@ -333,7 +332,7 @@
          if ( io /= 0 ) exit
          line = adjustl(line)
          if ( line(:keylen) .eq. trim(key) ) then
-           iost = 0 
+           iost = 0
 !
            read(uniinp,*) line
            read(uniinp,*) line
@@ -369,22 +368,22 @@
 !
 ! READWIBERG - READ WIBERG bond index matrix
 !
-! This subroutine 
+! This subroutine
 !
-       subroutine readwiberg(opt,nat,wiberg)    
+       subroutine readwiberg(opt,nat,wiberg)
 !
        implicit none
 !
 ! Input/output variables
 !
-       character(len=leninp),intent(in)             ::  opt     ! 
+       character(len=leninp),intent(in)             ::  opt     !
        real(kind=8),dimension(nat,nat),intent(out)  ::  wiberg  !  Wiberg bond index matrix
        integer,intent(in)                           ::  nat     !  Number of nodes
 !
 ! Local variables
-! 
+!
        character(len=lenline)                       ::  line    !  Line read
-       character(len=lenline)                       ::  key     !  
+       character(len=lenline)                       ::  key     !
        character(len=lentag)                        ::  str1    !  Auxiliary string
        character(len=lentag)                        ::  str2    !  Auxiliary string
        integer                                      ::  keylen  !  Keyword length
@@ -394,13 +393,13 @@
 !
        integer                                      ::  ilower  !
        integer                                      ::  iupper  !
-       integer                                      ::  num     ! 
-       integer,parameter                            ::  ncol = 9  ! 
+       integer                                      ::  num     !
+       integer,parameter                            ::  ncol = 9  !
 !
 ! Reading Wiberg bond index matrix
 ! --------------------------------
 !
-! Finding the last line starting with the specified keyword 
+! Finding the last line starting with the specified keyword
 !
        open(unit=20,file=trim(opt),action='read',status='old',iostat=io)
 !
