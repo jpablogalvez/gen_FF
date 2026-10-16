@@ -61,18 +61,20 @@
 !
 ! Input/output variables
 !
-       real(kind=8),dimension(nat,nat),intent(in)  ::  wiberg  !  Atomic coordinates
+       real(kind=8),dimension(nat,nat),intent(in)  ::  wiberg  ! Dimensionless bond indices
        logical,dimension(nat,nat),intent(out)      ::  adj     !  Adjacency matrix
        integer,intent(in)                          ::  nat     !  Number of nodes
 !
 ! Local variables
 !
-       real(kind=8)                                ::  thr     !  Bond threshold
+       real(kind=8)                                ::  thr     ! Dimensionless bond threshold
        integer                                     ::  i,j     !  Indexes
 !
 ! Building adjacency matrix according to Wiberg bond indexes
 !
-       thr = 0.70d0
+! Global connectivity cutoff; equality counts as a bond. Rigidity uses
+! separate thresholds and is not changed here.
+       thr = 0.50d0
 !
        adj(:,:) = .FALSE.
 !
