@@ -662,13 +662,13 @@
                     bonded%bond,bonded%kbond,bonded%fbond,             &
                     adjbond,debug)
 !
-      if ( nat .gt. 2 ) then
+      if ( nat .ge. 3 ) then
         call genangles(nat,coord,bonded%nbond,bonded%ibond,adjbond,    &
                        bonded%nang,bonded%iang,bonded%ang,bonded%kang, &
                        bonded%fang,adjang,edgeang,debug)
        end if
 !
-       if ( nat .gt. 3 ) then
+       if ( nat .ge. 4 ) then
          call gendihe(nat,adj,ideg,idat,coord,wiberg,znum,lcycle,      &
                       lrigid,laroma,latar,lch3,ich3,bonded%nbond,      &
                       bonded%ibond,bonded%nang,bonded%iang,adjang,     &
@@ -676,7 +676,10 @@
                       fnitro,fideal,debug)
        end if
 !
-       deallocate(adjbond,adjang,edgeang)
+! Diatomics have bonds but never allocate the angle representation.
+       if ( allocated(adjbond) ) deallocate(adjbond)
+       if ( allocated(adjang) ) deallocate(adjang)
+       if ( allocated(edgeang) ) deallocate(edgeang)
 !
        return
        end subroutine genffbonded

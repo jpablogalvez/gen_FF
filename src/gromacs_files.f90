@@ -745,8 +745,14 @@
 ! Printing bonded terms
 !
        call print_bond(uni,top%bonded)
-       if ( top%bonded%nang .ge. 1 ) call print_angle(uni,top%bonded)
-       if ( dihe%ndihe .ge. 1 ) call print_dihe(uni,dihe)
+! Atom-count guards also protect arrays intentionally absent in small molecules.
+       if ( nat .ge. 3 ) then
+         if ( top%bonded%nang .ge. 1 ) call print_angle(uni,top%bonded)
+       end if
+       if ( nat .ge. 4 ) then
+         if ( (dihe%nrigid+dihe%nimpro+dihe%ninv+dihe%ntor) .gt. 0 ) &
+           call print_dihe(uni,dihe)
+       end if
 !
 ! Printing pairs section
 !

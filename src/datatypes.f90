@@ -88,12 +88,13 @@
          integer,dimension(:),allocatable           ::  idbond   !  
          integer,dimension(:),allocatable           ::  idang    !  
          integer,dimension(:),allocatable           ::  multi    !  Torsional potential multiplicity
-         integer                                    ::  nbond    !  Bonds number
-         integer                                    ::  nang     !  Angles number
-         integer                                    ::  ndihe    !  Torsions number
-         integer                                    ::  nidbond  !  
-         integer                                    ::  nidang   !  
-         integer                                    ::  mdihe    !  Multiplicity
+! Empty bonded sets are valid, including omitted reference sections.
+         integer                                    ::  nbond = 0 ! Bonds number
+         integer                                    ::  nang = 0  ! Angles number
+         integer                                    ::  ndihe = 0 ! Torsions number
+         integer                                    ::  nidbond = 0 !
+         integer                                    ::  nidang = 0 !
+         integer                                    ::  mdihe = 0 ! Multiplicity
        end type grobonded
 !
        type grononbonded
@@ -154,17 +155,19 @@
          integer,dimension(:),allocatable           ::  depquad  !
          integer,dimension(:),allocatable           ::  mapquad  !
          integer,dimension(:),allocatable           ::  ich3     !
-         integer                                    ::  nquad    !
-         integer                                    ::  ndihe    !
-         integer                                    ::  nflexi   !
-         integer                                    ::  nrigid   !
-         integer                                    ::  nimpro   !
-         integer                                    ::  ninv     !
-         integer                                    ::  ntor     !
-         integer                                    ::  nidflexi !
-         integer                                    ::  nidrigid !
-         integer                                    ::  nidimpro !
-         integer                                    ::  nidinv   !
+! Molecules with fewer than four atoms never enter dihedral generation.
+! Keep their counters defined without allocating placeholder arrays.
+         integer                                    ::  nquad = 0 !
+         integer                                    ::  ndihe = 0 !
+         integer                                    ::  nflexi = 0 !
+         integer                                    ::  nrigid = 0 !
+         integer                                    ::  nimpro = 0 !
+         integer                                    ::  ninv = 0 !
+         integer                                    ::  ntor = 0 !
+         integer                                    ::  nidflexi = 0 !
+         integer                                    ::  nidrigid = 0 !
+         integer                                    ::  nidimpro = 0 !
+         integer                                    ::  nidinv = 0 !
        end type dihedrals
 !
        type grotop

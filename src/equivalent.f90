@@ -854,6 +854,8 @@
 !
          top%bonded = reftop%bonded
 !
+         if ( nat .ge. 4 ) then
+!
          call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
 ! Finding principal quadruplets
@@ -865,6 +867,8 @@
 !
          allocate(lch3(dihe%nflexi),ich3(3,dihe%nflexi))
          call genmethlist(nat,adj,znum,dihe,dihe%nflexi,lch3,ich3,debug)
+!
+         end if
 !
 ! TODO: check if equilibrium distances should be taken from external geometry
 !
@@ -879,11 +883,17 @@
 ! compacted.  When -p is supplied, the user-provided functional form must not
 ! be changed by these filters.
 !
+! A dihedral requires four atoms. Smaller molecules keep zero counters
+! and leave the associated arrays unallocated.
+       if ( nat .ge. 4 ) then
+!
        if ( (fquad) .and. (len_trim(intop) .eq. 0) )                  &
          call screenquad(dihe,dihe%nflexi,lch3,ich3,dihe%ndihe,nat,idat)
 !
        if ( (dihe%nquad .gt. 1) .and. (len_trim(intop) .eq. 0) )       &
          call selectquad(nat,dihe%nquad,dihe,idat,nidat,debug)
+!
+       end if
 !
        fstep2 = .TRUE.
 !
@@ -891,6 +901,7 @@
 ! output is present.  Missing scans are generated as Gaussian input files and
 ! Step2 is postponed.
 !
+       if ( nat .ge. 4 ) then
        do i = 1, dihe%nquad
 !
          write(cnum,'(I2.2)') i
@@ -908,6 +919,7 @@
          end if
 !
        end do
+       end if
 !
 ! Symmetrizing force field terms
 ! ------------------------------
