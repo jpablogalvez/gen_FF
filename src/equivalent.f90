@@ -51,6 +51,7 @@
        logical                                         ::  fpairs   !
        logical                                         ::  fexcl    !
        logical                                         ::  debug    !
+       logical                                         ::  lstereo
 !
 ! File names
 !
@@ -671,6 +672,17 @@
 !
        call gentypes(nat,eqv,lab,newlab,ilab,nlab,eqlab,idat,nidat,    &
                      debug)
+!
+! QM supplies the rigid/aromatic masks and geometry required for stereo
+! refinement. Reference-only typing retains its established behavior.
+!
+       if (fqmout) then
+         call refine_stereotypes(nat,adj,lrigid,laroma,coord,idat,   &
+                                 eqv,lstereo,debug)
+         if (lstereo)                                        &
+           call gentypes(nat,eqv,lab,newlab,ilab,nlab,eqlab,idat,     &
+                         nidat,debug)
+       end if
 !
        top%nat = nat
 !
@@ -1986,8 +1998,10 @@
 !~                                                           '_freqchk.agr'
        write(unijoyce,'(A)') '$gracefreq  joyce.freqchk.agr'
        write(unijoyce,*)
-       if ( fsymm ) write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
-       if ( fsymm ) write(unijoyce,*)
+!~        if ( fsymm ) write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
+!~        if ( fsymm ) write(unijoyce,*)
+       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
+       write(unijoyce,*)
        write(unijoyce,'(A)') '$dependence 1.2'
 !
        rewind(unitmp)
@@ -2070,14 +2084,14 @@
        write(unijoyce,'(A)') '$gracefreq  joyce.freqchk.agr'
        write(unijoyce,'(A)') '$gracetors        torschk.agr'
        write(unijoyce,*)
-       if ( fsymm ) then
+!~        if ( fsymm ) then
          write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%ntor
          write(unijoyce,*)
-       else
-         write(unijoyce,'(2(A,I4))') '$keepff ',nstiff+1,' - ',        &
-                                                        nstiff+dihe%ntor
-         write(unijoyce,*)
-       end if
+!~        else
+!~          write(unijoyce,'(2(A,I4))') '$keepff ',nstiff+1,' - ',        &
+!~                                                         nstiff+dihe%ntor
+!~          write(unijoyce,*)
+!~        end if
 !
 ! Printing dependencies between flexible terms
 !

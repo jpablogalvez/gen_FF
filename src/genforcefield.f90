@@ -10,6 +10,7 @@
 !
        private
        public  ::  gentypes,                                           &
+                   refine_stereotypes,                                &
                    genffbonded,                                        &
                    eqvatms,                                            &
                    nearnei
@@ -498,6 +499,183 @@
 !
 !======================================================================!
 !
+! REFINE_STEREOTYPES - split topological classes by cis/trans environment
+!
+! Refine existing types using planar relations across rigid nonaromatic
+! bonds. All substituents participate; graph refinement carries distinctions
+! into their branches without measuring torsions about single bonds.
+       subroutine refine_stereotypes(nat,adj,lrigid,laroma,coord,    &
+                                     initial,eqv,changed,debug)
+       use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+       implicit none
+       integer,intent(in) :: nat,initial(nat)
+       logical,intent(in) :: adj(nat,nat),lrigid(nat,nat)
+       logical,intent(in) :: laroma(nat,nat),debug
+       real(kind=8),intent(in) :: coord(3,nat) ! Angstrom
+       logical,intent(inout) :: eqv(nat,nat)
+       logical,intent(out) :: changed
+       integer,allocatable :: relations(:,:),signature(:,:),tuples(:,:)
+       integer :: degree(nat),colors(nat),nextcolors(nat),nrel(nat)
+       integer :: i,j,a,d,k,q,nq,start,n,ntypes,oldtypes,iteration
+       integer :: temporary(4),side
+       logical :: blocked(nat),valid
+       real(kind=8) :: axis(3),u(3),v(3),pu(3),pv(3),length,cosphi
+! New cis/trans window in degrees; compatible with the existing OOP
+! planarity criterion. The roundoff guard below is dimensionless.
+       real(kind=8),parameter :: planar_window_deg = 25.d0
+       real(kind=8),parameter :: pi = 4*atan(1.d0)
+       real(kind=8),parameter :: roundoff_guard = 64*epsilon(1.d0)
+       real(kind=8),parameter :: planar_cos =                     &
+                                  cos(planar_window_deg*pi/180.d0)
+
+       changed = .false.
+       if (nat < 4) return
+       if (.not. all(ieee_is_finite(coord))) then
+         write(*,'(A)') 'WARNING: nonfinite geometry; stereo typing skipped.'
+         return
+       end if
+       degree = count(adj,dim=1)
+! Each degree-2/3 center has at most two substituents per eligible bond:
+! four cross-bond pairs, each stored in both directions (eight per edge).
+       allocate(relations(5,4*count(adj)))
+       nq = 0
+       blocked = .false.
+       do i = 1,nat-1
+         do j = i+1,nat
+           if (.not. adj(i,j) .or. .not. lrigid(i,j)) cycle
+           if (laroma(i,j)) cycle
+           if (degree(i)<2 .or. degree(i)>3) cycle
+           if (degree(j)<2 .or. degree(j)>3) cycle
+           start = nq
+           axis = coord(:,j)-coord(:,i)
+           length = sqrt(sum(axis**2))
+           valid = length > tiny(1.d0)
+           if (valid) axis = axis/length
+           do a = 1,nat
+             if (.not. adj(a,i) .or. a==j) cycle
+             do d = 1,nat
+               if (.not. adj(d,j) .or. d==i) cycle
+               if (a==d .or. .not. valid) then
+                 valid = .false.
+                 cycle
+               end if
+               u = coord(:,a)-coord(:,i)
+               v = coord(:,d)-coord(:,j)
+               pu = u-dot_product(u,axis)*axis
+               pv = v-dot_product(v,axis)*axis
+               if (sum(pu**2)<=roundoff_guard*sum(u**2) .or.       &
+                   sum(pv**2)<=roundoff_guard*sum(v**2) .or.       &
+                   sum(u**2)<=tiny(1.d0) .or.                     &
+                   sum(v**2)<=tiny(1.d0)) then
+                 valid = .false.
+                 cycle
+               end if
+               cosphi = dot_product(pu,pv)/                      &
+                                  sqrt(sum(pu**2)*sum(pv**2))
+               if (abs(cosphi)<planar_cos) then
+                 valid = .false.
+                 cycle
+               end if
+               side = 1
+               if (cosphi<0.d0) side = 2
+               relations(:,nq+1) = [a,i,j,d,side]
+               relations(:,nq+2) = [d,j,i,a,side]
+               nq = nq+2
+             end do
+           end do
+           if (.not. valid) then
+! Do not split a class using partial/ambiguous geometric information.
+             nq = start
+             do a = 1,nat
+               if ((adj(a,i).and.a/=j).or.(adj(a,j).and.a/=i))     &
+                 blocked(initial(a)) = .true.
+             end do
+             write(*,'(A,I0,A,I0,A)') 'WARNING: stereo typing at bond ', &
+               i,'-',j,': ambiguous geometry; affected types preserved.'
+           end if
+         end do
+       end do
+       if (nq==0) return
+       nrel = 0
+       do q = 1,nq
+         a = relations(1,q)
+         nrel(a) = nrel(a)+1
+       end do
+       allocate(tuples(4,maxval(nrel)))
+       allocate(signature(1+nat+4*maxval(nrel),nat))
+       colors = initial
+       oldtypes = maxval(colors)
+       do iteration = 1,nat
+         signature = 0
+         do a = 1,nat
+           signature(1,a) = colors(a)
+           if (blocked(initial(a))) cycle
+! First split only by stereochemistry. Later rounds propagate the split
+! through connectivity and reevaluate stereo signatures until stable.
+           if (iteration>1) then
+             do i = 1,nat
+               if (adj(a,i)) signature(1+colors(i),a) =           &
+                                          signature(1+colors(i),a)+1
+             end do
+           end if
+           n = 0
+           do q = 1,nq
+             if (relations(1,q)/=a) cycle
+             n = n+1
+             tuples(:,n) = [colors(relations(2,q)),              &
+               colors(relations(3,q)),colors(relations(4,q)),    &
+               relations(5,q)]
+           end do
+! Sort tuples lexicographically, retaining multiplicity and avoiding an
+! arbitrary reference substituent or atom-index-dependent orientation.
+           do i = 2,n
+             temporary = tuples(:,i)
+             j = i-1
+             do while (j>=1)
+               do k = 1,4
+                 if (temporary(k)/=tuples(k,j)) exit
+               end do
+               if (k>4) exit
+               if (temporary(k)>tuples(k,j)) exit
+               tuples(:,j+1) = tuples(:,j)
+               j = j-1
+             end do
+             tuples(:,j+1) = temporary
+           end do
+           if (n>0) signature(nat+2:nat+1+4*n,a) =              &
+                                             reshape(tuples(:,:n),[4*n])
+         end do
+         ntypes = 0
+         do i = 1,nat
+           do j = 1,i-1
+             if (all(signature(:,i)==signature(:,j))) exit
+           end do
+           if (j<i) then
+             nextcolors(i) = nextcolors(j)
+           else
+             ntypes = ntypes+1
+             nextcolors(i) = ntypes
+           end if
+         end do
+         if (ntypes==oldtypes) exit
+         changed = .true.
+         colors = nextcolors
+         oldtypes = ntypes
+       end do
+       if (.not. changed) return
+! eqvatms may represent a class by a sparse star. Rebuild its complete
+! partition, otherwise removing the star center could lose valid matches.
+       do i = 1,nat
+         do j = 1,nat
+           eqv(i,j) = colors(i)==colors(j) .and. i/=j
+         end do
+       end do
+       if (debug) write(*,'(A,I0,A,I0)') 'Stereo atom types: ',     &
+                                     maxval(initial),' -> ',oldtypes
+       end subroutine refine_stereotypes
+
+!======================================================================!
+!
 ! GENTYPES - GENerate atom TYPES
 !
 ! This subroutine
@@ -817,9 +995,13 @@
 ! Computing angle-bending equilibrium terms
 !
        do i = 1, nang
+!
          ang(i) = calc_angle(coord(:,iang(1,i)),coord(:,iang(2,i)),    &
                                                      coord(:,iang(3,i)))
          ang(i) = ang(i)*180.0d0/pi
+!
+         if ( ang(i) .gt. 170 ) ang(i) = 180.0d0 ! TODO: add ideal value option
+!
        end do
 !
        kang(:) = 0.0d0
