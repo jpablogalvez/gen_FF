@@ -395,23 +395,31 @@
        integer                                      ::  iupper  !
        integer                                      ::  num     !
        integer,parameter                            ::  ncol = 9  !
+       logical                                      ::  spin ! Alpha/beta NBO section
 !
 ! Reading Wiberg bond index matrix
 ! --------------------------------
 !
-! Finding the last line starting with the specified keyword
+! Keep the last total-density matrix; spin-resolved indices are not used
+! for molecular connectivity. Wiberg indices are dimensionless.
 !
        open(unit=20,file=trim(opt),action='read',status='old',iostat=io)
 !
        key    = 'Wiberg bond index matrix in the NAO basis'
        keylen = len_trim(key)
        ikey   = 1
+       spin   = .FALSE.
 !
        do
          read(20,'(A)',iostat=io) line
          if ( io /= 0 ) exit
          line = adjustl(line)
-         if ( line(:keylen) .eq. trim(key) ) then
+! A new NBO analysis starts with the total density, even after beta output
+! from an earlier geometry. The repeated title banner is harmless.
+         if ( index(line,'Gaussian NBO Version') > 0 ) spin = .FALSE.
+         if ( index(line,'Alpha spin orbitals') > 0 .or. &
+              index(line,'Beta  spin orbitals') > 0 ) spin = .TRUE.
+         if ( line(:keylen) .eq. trim(key) .and. .not. spin ) then
 !
            ikey = 0
 !
