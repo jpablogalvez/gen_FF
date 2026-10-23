@@ -676,12 +676,11 @@
 ! QM supplies the rigid/aromatic masks and geometry required for stereo
 ! refinement. Reference-only typing retains its established behavior.
 !
-       if (fqmout) then
-         call refine_stereotypes(nat,adj,lrigid,laroma,coord,idat,   &
+       if ( fqmout ) then
+         call refine_stereotypes(nat,adj,lrigid,laroma,coord,idat,     &
                                  eqv,lstereo,debug)
-         if (lstereo)                                        &
-           call gentypes(nat,eqv,lab,newlab,ilab,nlab,eqlab,idat,     &
-                         nidat,debug)
+         if ( lstereo ) call gentypes(nat,eqv,lab,newlab,ilab,nlab,    &
+                                      eqlab,idat,nidat,debug)
        end if
 !
        top%nat = nat
@@ -831,8 +830,7 @@
 ! Hybrid route: keep the generated flexible torsions/Fourier series, but
 ! replace all stiff modes by the exact terms supplied in --reference-stiff.
 !
-           call replacestiff(top%bonded,dihe,         &
-                                              reftop%bonded,nat,adj)
+           call replacestiff(top%bonded,dihe,reftop%bonded,nat,adj)
          end if
 !
        else
@@ -868,17 +866,18 @@
 !
          if ( nat .ge. 4 ) then
 !
-         call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
+           call bonded2dihe(reftop%bonded%ndihe,top%bonded,dihe,nat,adj)
 !
 ! Finding principal quadruplets
 !
-         call genquad(nat,coord,adj,ideg,lcycle,lrigid,znum,dihe,      &
-                      dihe%ndihe,debug)
+           call genquad(nat,coord,adj,ideg,lcycle,lrigid,znum,dihe,    &
+                        dihe%ndihe,debug)
 !
 ! Finding quadruplets associated to CH3 rotations
 !
-         allocate(lch3(dihe%nflexi),ich3(3,dihe%nflexi))
-         call genmethlist(nat,adj,znum,dihe,dihe%nflexi,lch3,ich3,debug)
+           allocate(lch3(dihe%nflexi),ich3(3,dihe%nflexi))
+           call genmethlist(nat,adj,znum,dihe,dihe%nflexi,             &
+                            lch3,ich3,debug)
 !
          end if
 !
@@ -897,6 +896,7 @@
 !
 ! A dihedral requires four atoms. Smaller molecules keep zero counters
 ! and leave the associated arrays unallocated.
+!
        if ( nat .ge. 4 ) then
 !
        if ( (fquad) .and. (len_trim(intop) .eq. 0) )                  &
@@ -975,9 +975,14 @@
        call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
                         fpairs,fsymm)
        if ( (dihe%nflexi.gt.0) .and. fstep2 ) then
+!
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
                           fsymm,topsrc,top%bonded,dihe,nstep)
+!
+         call validation('Step2',dihe)
+!
        else if ( dihe%nflexi.gt.0 ) then
+!
          write(*,*)
          write(*,'(2X,68("*"))')
          write(*,'(3X,A)') 'NOTE:  Joyce step 2 input was not generated'
@@ -986,6 +991,11 @@
                            trim(qmdir)
          write(*,'(2X,68("*"))')
          write(*,*)
+!
+      else
+!
+        call validation('Step1',dihe)
+!
        end if
 !
 ! Printing summary of the input information
@@ -2024,7 +2034,7 @@
 !
 !======================================================================!
 !
-! PRINT_STEP1 - PRINT input STEP 2
+! PRINT_STEP2 - PRINT input STEP 2
 !
 ! This subroutine
 !
@@ -2200,5 +2210,310 @@
        return
 !
        end subroutine print_step2
+!
+!======================================================================!
+!
+! VALIDATION - VALIDATION
+!
+! This subroutine
+!
+       subroutine validation(step,dihe)
+!
+       use units,     only: uniout
+!
+       use printings, only: print_end
+       use datatypes, only: grobonded,                                 &
+                            dihedrals
+!
+       implicit none
+!
+! Input/output variables
+!
+       type(dihedrals),intent(inout)                ::  dihe  !
+       character(len=5)                             ::  step  !
+!
+! Local variables
+!
+       character(len=120),dimension(:),allocatable  ::  cname !
+       character(len=10),dimension(:),allocatable   ::  cnum  !
+       integer                                      ::  io    !
+       integer                                      ::  i     !
+!
+! Generating index file
+! ---------------------
+!
+       if ( dihe%nquad .gt. 0 ) then
+
+         call execute_command_line('mkdir -p ../Validation/MMScans',   &
+                                 wait=.TRUE.,exitstat=io)
+!
+         if ( io .ne. 0 ) then
+          write(*,*)
+          write(*,'(2X,68("="))')
+          write(*,'(3X,A)') 'ERROR:  Could not create MMScans directory'
+          write(*,*)
+          write(*,'(3X,A)') 'Directory : ../Validation/MMScans'
+          write(*,'(2X,68("="))')
+          write(*,*)
+          call print_end()
+         end if
+!
+         open(unit=uniout,file='../Validation/MMScans/dihed.ndx',      &
+              action='write')
+!
+         allocate(cnum(dihe%nquad),cname(dihe%nquad))
+!
+         do i = 1, dihe%nquad
+           write(cnum(i),'(I2.2)') i
+           cnum(i)  = adjustl(cnum(i))
+           cname(i) = 'D'//trim(cnum(i))
+           write(uniout,'(A)') '[ '//trim(cname(i))//' ]'
+           write(uniout,*) dihe%iquad(:,i)
+         end do
+!
+         close(uniout)
+!
+       end if
+!
+! Generating Gromacs input file
+! -----------------------------
+!
+       call execute_command_line('mkdir -p ../Validation/Virial',      &
+                                 wait=.TRUE.,exitstat=io)
+!
+       if ( io .ne. 0 ) then
+        write(*,*)
+        write(*,'(2X,68("="))')
+        write(*,'(3X,A)') 'ERROR:  Could not create Virial directory'
+        write(*,*)
+        write(*,'(3X,A)') 'Directory : ../Validation/Virial'
+        write(*,'(2X,68("="))')
+        write(*,*)
+        call print_end()
+       end if
+!
+       open(unit=uniout,file='../Validation/Virial/vacuum.mdp',        &
+            action='write')
+!
+       write(uniout,'(A)') ';'
+       write(uniout,'(A)') ';	MD in vacuo for Intra-FF checking'
+       write(uniout,'(A)') ';'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; VARIOUS PREPROCESSING OPTIONS'
+       write(uniout,'(A)') 'include                  ='
+       write(uniout,'(A)') 'define                   ='
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; RUN CONTROL PARAMETERS'
+       write(uniout,'(A)') 'integrator               = md'
+       write(uniout,'(A)') '; start time and timestep in ps'
+       write(uniout,'(A)') 'tinit                    = 0.0'
+       write(uniout,'(A)') 'dt                       = 0.0001   ; 0.1 fs'
+       write(uniout,'(A)') 'nsteps                   = 10000000 ; 1 ns' 
+       write(uniout,'(A)') '; after checkpoint or tpbconv restart '//  &
+                                              'we can start on step > 0'
+       write(uniout,'(A)') 'init_step                = 0'
+       write(uniout,'(A)') '; mode for center of mass motion removal'
+       write(uniout,'(A)') 'comm-mode                = Angular'
+       write(uniout,'(A)') '; number of steps for center of mass '//   &
+                                                        'motion removal'
+       write(uniout,'(A)') 'nstcomm                  = 1'
+       write(uniout,'(A)') '; group(s) for center of mass motion removal'
+       write(uniout,'(A)') 'comm-grps                ='
+       write(uniout,'(A)') 
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; OUTPUT CONTROL OPTIONS'
+       write(uniout,'(A)') '; Output frequency for coords (x), '//     &
+                                         'velocities (v) and forces (f)'
+       write(uniout,'(A)') 'nstxout                  = 500000 ; 50 ps'
+       write(uniout,'(A)') 'nstvout                  = 0'
+       write(uniout,'(A)') 'nstfout                  = 0'
+       write(uniout,'(A)') '; Checkpointing helps you continue '//     &
+                                                         'after crashes'
+       write(uniout,'(A)') 'nstcheckpoint            = 0'
+       write(uniout,'(A)') '; Output frequency for energies to '//     &
+                                              'log file and energy file'
+       write(uniout,'(A)') 'nstlog                   = 500000 ; 50 ps'
+       write(uniout,'(A)') 'nstenergy                = 500000 ; 50 ps'
+       write(uniout,'(A)') '; Output frequency and precision for'//    &
+                                                             ' xtc file'
+       write(uniout,'(A)') 'nstxtcout                = 100000 ; 10 ps'
+       write(uniout,'(A)') 'xtc_precision            = 1000'
+       write(uniout,'(A)') '; This selects the subset of atoms for'//  &
+                                                ' the xtc file. You can'
+       write(uniout,'(A)') '; select multiple groups. By default '//   &
+                                            'all atoms will be written.'
+       write(uniout,'(A)') 'xtc-grps                 ='
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; Selection of energy groups'
+       write(uniout,'(A)') 'energygrps   ='
+       write(uniout,'(A)') 'freezegrps   ='  
+       write(uniout,'(A)') 'freezedim    ='  
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; NEIGHBORSEARCHING PARAMETERS'
+       write(uniout,'(A)') '; nblist update frequency'
+       write(uniout,'(A)') 'nstlist                  = 4'
+       write(uniout,'(A)') '; ns algorithm (simple or grid)'
+       write(uniout,'(A)') 'ns_type                  = simple'
+       write(uniout,'(A)') '; Periodic boundary conditions: xyz or no'
+       write(uniout,'(A)') 'pbc                      = no'
+       write(uniout,'(A)') '; nblist cut-off'        
+       write(uniout,'(A)') 'rlist                    = 1.1'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') 
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; OPTIONS FOR ELECTROSTATICS AND VDW'
+       write(uniout,'(A)') '; Method for doing electrostatics'
+       write(uniout,'(A)') 'coulombtype              = cut-off'
+       write(uniout,'(A)') 'rcoulomb-switch          = 0'
+       write(uniout,'(A)') 'rcoulomb                 = 1.1'
+       write(uniout,'(A)') '; Dielectric constant (DC) for cut-off '// &
+                                               'or DC of reaction field'
+       write(uniout,'(A)') 'epsilon_r                = 1'
+       write(uniout,'(A)') '; Method for doing Van der Waals'
+       write(uniout,'(A)') 'vdw-type                 = Cut-off'
+       write(uniout,'(A)') '; cut-off lengths'       
+       write(uniout,'(A)') 'rvdw-switch              = 0'
+       write(uniout,'(A)') 'rvdw                     = 1.1'
+       write(uniout,'(A)') '; Apply long range dispersion '//          &
+                                   'corrections for Energy and Pressure'
+       write(uniout,'(A)') 'DispCorr                 = no'
+       write(uniout,'(A)') '; Spacing for the PME/PPPM FFT grid'
+       write(uniout,'(A)') 'fourierspacing           = 0.12'
+       write(uniout,'(A)') '; FFT grid size, when a value is 0 '//     &
+                                           'fourierspacing will be used'
+       write(uniout,'(A)') 'fourier_nx               = 0'
+       write(uniout,'(A)') 'fourier_ny               = 0'
+       write(uniout,'(A)') 'fourier_nz               = 0'
+       write(uniout,'(A)') '; EWALD/PME/PPPM parameters'
+       write(uniout,'(A)') 'pme_order                = 4'
+       write(uniout,'(A)') 'ewald_rtol               = 1e-05'
+       write(uniout,'(A)') 'epsilon_surface          = 0'
+       write(uniout,'(A)') 'optimize_fft             = no'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; OPTIONS FOR WEAK COUPLING ALGORITHMS'
+       write(uniout,'(A)') '; Temperature coupling'  
+       write(uniout,'(A)') 'tcoupl                   = Berendsen'
+       write(uniout,'(A)') '; Groups to couple separately'
+       write(uniout,'(A)') 'tc_grps                  = System'
+       write(uniout,'(A)') '; Time constant (ps) and reference '//     &
+                                                       'temperature (K)'
+       write(uniout,'(A)') 'tau_t                    = 0.1'  
+       write(uniout,'(A)') 'ref_t                    = 298'
+       write(uniout,'(A)') '; Pressure coupling'     
+       write(uniout,'(A)') 'Pcoupl                   = no'
+       write(uniout,'(A)') 'Pcoupltype               = Isotropic'
+       write(uniout,'(A)') '; Time constant (ps), compressibility '//  &
+                                         '(1/bar) and reference P (bar)'
+       write(uniout,'(A)') 'tau_p                    = 10.0'
+       write(uniout,'(A)') 'compressibility          = 5e-5'
+       write(uniout,'(A)') 'ref_p                    = 1.0'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; GENERATE VELOCITIES FOR STARTUP RUN'
+       write(uniout,'(A)') 'gen_vel                  = yes'
+       write(uniout,'(A)') 'gen-temp                 = 298'
+       write(uniout,'(A)') 'gen-seed                 = 173529'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') '; OPTIONS FOR BONDS'    
+       write(uniout,'(A)') 'constraints              = none'
+       write(uniout,'(A)') 
+!
+      close(uniout)
+!
+! Generating Makefile
+! -------------------
+!
+       open(unit=uniout,file='../Validation/Makefile',action='write')
+!
+! Printing optimization and frequencies block
+!
+       write(uniout,'(A)') '# Generate FCHK from joyce topology'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') 'fchk: joyce_MMmin.fchk joyce_QMmin.fchk'
+       write(uniout,'(A)')
+       write(uniout,'(A)') 'joyce_MMmin.fchk:'
+       write(uniout,'(A)') ACHAR(9)//'# At equil MM'
+       write(uniout,'(A)') ACHAR(9)//'@mkdir OPTFREQ -p'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'nm_gromacs.sh -f ../../'//step//'/joyce.g0.xyz -minim '//    &
+                                     '-p ../../'//step//'/joyce.new.top'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'fchk2gro -f joyce.g0_min.xyz -o structure.fchk -ow -use-elems'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'gmxgrad_to_fchk joyce.g0_min_force.gmx'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'gmxhess_to_fchk joyce.g0_min_nm.gmx'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'cat structure.fchk gradients.fchk hessian.fchk > '//         &
+                                                      'joyce_MMmin.fchk'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'rm structure.fchk gradients.fchk hessian.fchk'
+       write(uniout,'(A)') 
+       write(uniout,'(A)') 'joyce_QMmin.fchk:'
+       write(uniout,'(A)') ACHAR(9)//'# At equil QM'
+       write(uniout,'(A)') ACHAR(9)//'@mkdir OPTFREQ -p'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'nm_gromacs.sh -f ../../'//step//'/joyce.g0.xyz '//           &
+                                     '-p ../../'//step//'/joyce.new.top'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'fchk2gro -f ../../'//step//'/joyce.g0.xyz '//                &
+                                      '-o structure.fchk -ow -use-elems'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'gmxgrad_to_fchk joyce.g0_force.gmx'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'gmxhess_to_fchk joyce.g0_nm.gmx'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'cat structure.fchk gradients.fchk hessian.fchk > '//         &
+                                                      'joyce_QMmin.fchk'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'rm structure.fchk gradients.fchk hessian.fchk'
+       write(uniout,'(A)') 
+!
+! Printing dihedral scan block
+!
+       if ( dihe%nquad .gt. 0 ) then
+         write(uniout,'(A)') 'scans:'
+         do i = 1, dihe%nquad
+           write(uniout,'(A)') ACHAR(9)//                              &
+             '@mkdir -p MMScans/Scan'//trim(cnum(i))
+           write(uniout,'(A)') ACHAR(9)//                              &
+             '@cd MMScans/Scan'//trim(cnum(i))//'; '//                 &
+             'mm_scan.sh -f ../../../'//step//'/joyce.g0.xyz '//       &
+             '-p ../../../'//step//'/joyce.new.top '//                 &
+             '-n ../dihed.ndx -D '//trim(cname(i))//' -skip_segfault'
+         end do
+         write(uniout,'(A)')
+       end if
+!
+! Printing virial test block
+!
+       write(uniout,'(A)') 'virial:'
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+         'printf "MOL Other\n" > residuetypes.dat'
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+         'grompp -f vacuum.mdp -c ../OPTFREQ/joyce.g0_min.g96 '//      &
+         '-p ../../Step1/joyce.new.top -o md.tpr'
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+         'mdrun -deffnm md'
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+       write(uniout,'(A)')
+!
+! Printing tail block
+!
+       write(uniout,'(A)') 'clean:'
+       write(uniout,'(A)') ACHAR(9)//                                  &
+         '@rm -r OPTFREQ MMScans* -v; sleep 0'
+       write(uniout,'(A)')
+       write(uniout,'(A)') '# Phony targets'
+       write(uniout,'(A)') '.PHONY: clean fchk scans'
+!
+       close(uniout)
+!
+       deallocate(cnum,cname)
+!
+       return
+!
+       end subroutine validation
 !
 !======================================================================!
