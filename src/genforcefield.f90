@@ -506,7 +506,6 @@
 ! into their branches without measuring torsions about single bonds.
        subroutine refine_stereotypes(nat,adj,lrigid,laroma,coord,    &
                                      initial,eqv,changed,debug)
-       use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
        implicit none
        integer,intent(in) :: nat,initial(nat)
        logical,intent(in) :: adj(nat,nat),lrigid(nat,nat)
@@ -530,10 +529,6 @@
 
        changed = .false.
        if (nat < 4) return
-       if (.not. all(ieee_is_finite(coord))) then
-         write(*,'(A)') 'WARNING: nonfinite geometry; stereo typing skipped.'
-         return
-       end if
        degree = count(adj,dim=1)
 ! Each degree-2/3 center has at most two substituents per eligible bond:
 ! four cross-bond pairs, each stored in both directions (eight per edge).

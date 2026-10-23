@@ -2495,8 +2495,8 @@
          '-p ../../Step1/joyce.new.top -o md.tpr'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
          'mdrun -deffnm md'
-       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
-       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+!~        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+!~        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
        write(uniout,'(A)')
 !
 ! Printing tail block
