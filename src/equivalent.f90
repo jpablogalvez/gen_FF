@@ -979,7 +979,7 @@
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
                           fsymm,topsrc,top%bonded,dihe,nstep)
 !
-         call validation('Step2',dihe)
+         call validation('Step2',dihe,meth,basis,disp,chrg,mult,resname)
 !
        else if ( dihe%nflexi.gt.0 ) then
 !
@@ -994,7 +994,7 @@
 !
       else
 !
-        call validation('Step1',dihe)
+        call validation('Step1',dihe,meth,basis,disp,chrg,mult,resname)
 !
        end if
 !
@@ -2217,9 +2217,10 @@
 !
 ! This subroutine
 !
-       subroutine validation(step,dihe)
+       subroutine validation(step,dihe,meth,basi,disp,chrg,mult,resname)
 !
        use units,     only: uniout
+       use lengths,   only: lenlab
 !
        use printings, only: print_end
        use datatypes, only: grobonded,                                 &
@@ -2230,12 +2231,21 @@
 ! Input/output variables
 !
        type(dihedrals),intent(inout)                ::  dihe  !
-       character(len=5)                             ::  step  !
+       character(len=5),intent(in)                  ::  step  !
+       character(len=20),intent(in)                 ::  meth  !
+       character(len=20),intent(in)                 ::  basi  !
+       character(len=30),intent(in)                 ::  disp  !
+       character(len=lenlab),intent(in)             ::  resname  !
+       integer,intent(in)                           ::  chrg  !
+       integer,intent(in)                           ::  mult  !
 !
 ! Local variables
 !
        character(len=120),dimension(:),allocatable  ::  cname !
        character(len=10),dimension(:),allocatable   ::  cnum  !
+       character(len=30)                            ::  cdisp !
+       character(len=2)                             ::  cchrg !
+       character(len=2)                             ::  cmult !
        integer                                      ::  io    !
        integer                                      ::  i     !
 !
@@ -2487,16 +2497,35 @@
 !
 ! Printing virial test block
 !
+       if ( (trim(disp).eq.'none') .or. (len_trim(disp).eq.0) ) then
+         cdisp = ''
+       else
+         cdisp = '-a empiricaldispersion='//trim(disp)
+       end if
+!
+       write(cchrg,'(I2)') chrg
+       cchrg = adjustl(cchrg)
+!
+       write(cmult,'(I2)') mult
+       cmult = adjustl(cchrg)
+!
        write(uniout,'(A)') 'virial:'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
-         'printf "MOL Other\n" > residuetypes.dat'
+         'printf "'//trim(resname)//' Other\n" > residuetypes.dat'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
          'grompp -f vacuum.mdp -c ../OPTFREQ/joyce.g0_min.g96 '//      &
          '-p ../../Step1/joyce.new.top -o md.tpr'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
          'mdrun -deffnm md'
-!~        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
-!~        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+         'echo 0 0 | trjconv -f md.trr -o snap.g96 -s md.tpr '//       &
+         '-dt 100 -sep -nzero 2 -center'
+       write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
+         'for i in *g96; do '//                                        &
+         'fchk2gro -f "$$i" -o "$${i%.g96}.xyz" -ow ; '//              &
+         'xyz2g16.sh -f "$${i%.g96}.xyz" -c SP -chrg '//cchrg//        &
+                   ' -mult '//cmult//' -m '//trim(meth)//              &
+                   " -b '"//trim(basi)//"' "//trim(cdisp)//' ; done'
        write(uniout,'(A)')
 !
 ! Printing tail block
@@ -2510,7 +2539,7 @@
 !
        close(uniout)
 !
-       deallocate(cnum,cname)
+       if ( dihe%nquad .gt. 0 ) deallocate(cnum,cname)
 !
        return
 !
