@@ -27,6 +27,7 @@
        character(len=leninp)                           ::  ref      !
        character(len=leninp)                           ::  intop    !
        character(len=leninp)                           ::  stifftop !
+       character(len=leninp)                           ::  nbfile   ! Nonbonded source
        character(len=leninp)                           ::  topout   !
        character(len=leninp)                           ::  qmout    !
        character(len=leninp)                           ::  qmdir    !
@@ -51,7 +52,7 @@
        logical                                         ::  fpairs   !
        logical                                         ::  fexcl    !
        logical                                         ::  debug    !
-       logical                                         ::  lstereo
+!~        logical                                         ::  lstereo
 !
 ! File names
 !
@@ -74,6 +75,7 @@
        logical                                         ::  fstep2   !
        logical                                         ::  ftopsrc  !
        logical                                         ::  fstiffref!
+       logical                                         ::  fnb
 !
 ! QC calculation information
 !
@@ -125,6 +127,7 @@
 !
         type(grotop)                                   ::  reftop   !  New topology
         type(grotop)                                   ::  top      !  New topology
+        type(grotop)                                   ::  nbref    ! --nb source only
         type(dihedrals)                                ::  dihe     !  Dihedrals
 !
 ! Atom types information
@@ -175,7 +178,7 @@
 ! Parse the workflow in one place: input/output files, QM defaults, topology
 ! generation switches, Joyce dependency policy, and equilibrium-value policy.
 !
-       call command_line(inp,ref,intop,stifftop,topout,qmout,qmdir,    &
+       call command_line(inp,ref,intop,stifftop,nbfile,topout,qmout,qmdir, &
                          knei,iroute,formt,meth,basis,disp,chrg,mult,  &
                          step,nstep,sysname,resname,nmol,fsig,feps,    &
                          fsymm,fpairs,fexcl,fquad,fring,fhetero,       &
@@ -198,6 +201,7 @@
        end if
 !
        fstiffref = len_trim(stifftop) .gt. 0
+       fnb       = len_trim(nbfile) .gt. 0
        ftopsrc   = (len_trim(intop) .gt. 0) .or. fstiffref
        topsrc    = intop
        if ( fstiffref ) topsrc = stifftop
@@ -356,6 +360,12 @@
          write(*,*)
        end if
 !
+! --nb requires QM, including when a bonded reference is also supplied.
+       if (fnb .and. .not. fqmout) then
+         write(*,'(A)') 'ERROR: --nb requires QM output; provide -qc/--qmout.'
+         error stop 1
+       end if
+!
 ! Checking if a reference topology is provided
 !
        if ( ftopsrc ) then
@@ -365,8 +375,10 @@
 ! Nonbonded parameters copied from a reference topology can be scaled from the
 ! command line.  This scaling does not change the bonded functional form.
 !
-         reftop%attype%sig(:) = reftop%attype%sig(:)*fsig
-         reftop%attype%eps(:) = reftop%attype%eps(:)*feps
+         if (.not. fnb) then
+           reftop%attype%sig(:) = reftop%attype%sig(:)*fsig
+           reftop%attype%eps(:) = reftop%attype%eps(:)*feps
+         end if
 !
          nat = reftop%nat
 !
@@ -484,6 +496,23 @@
          end do
 !
          close(uniinp)
+       end if
+!
+! Keep the nonbonded source independent of all graph/typing inputs.
+       if (fnb) then
+         call read_nb_top(nbref,trim(nbfile))
+         if (nbref%nat/=nat) then
+           write(*,'(A,A,A,I0,A,I0)') 'ERROR: --nb ',trim(nbfile), &
+             ': atom count ',nbref%nat,' differs from QM system ',nat
+           error stop 1
+         end if
+         if (ftopsrc) then
+           if (reftop%nat/=nat) then
+             write(*,'(A)') 'ERROR: --nb: bonded reference/QM atom count mismatch'
+             error stop 1
+           end if
+         end if
+         write(*,'(A,A)') 'Nonbonded source (--nb): ',trim(nbfile)
        end if
 !
 ! Allocating general variables
@@ -673,15 +702,15 @@
        call gentypes(nat,eqv,lab,newlab,ilab,nlab,eqlab,idat,nidat,    &
                      debug)
 !
-! QM supplies the rigid/aromatic masks and geometry required for stereo
-! refinement. Reference-only typing retains its established behavior.
+! Stereo refinement temporarily disabled pending careful bug diagnosis.
+! Keep the implementation available; use only the topological types above.
 !
-       if ( fqmout ) then
-         call refine_stereotypes(nat,adj,lrigid,laroma,coord,idat,     &
-                                 eqv,lstereo,debug)
-         if ( lstereo ) call gentypes(nat,eqv,lab,newlab,ilab,nlab,    &
-                                      eqlab,idat,nidat,debug)
-       end if
+!~        if ( fqmout ) then
+!~          call refine_stereotypes(nat,adj,lrigid,laroma,coord,idat,     &
+!~                                  eqv,lstereo,debug)
+!~          if ( lstereo ) call gentypes(nat,eqv,lab,newlab,ilab,nlab,    &
+!~                                       eqlab,idat,nidat,debug)
+!~        end if
 !
        top%nat = nat
 !
@@ -811,6 +840,10 @@
        end if
 !
        top%atom%attype(:) = newlab(:)
+!
+! --nb overrides only defaults, atom-type parameters and per-atom records.
+! The generated type map and all bonded/reference data remain independent.
+       if (fnb) call apply_nb_top(top,nbref,itype,trim(nbfile),fsig,feps)
 !
 ! Force Field generation
 ! ----------------------
@@ -1188,7 +1221,7 @@
 !
 !======================================================================!
 !
-       subroutine command_line(inp,ref,top,stifftop,topout,qmout,      &
+       subroutine command_line(inp,ref,top,stifftop,nbfile,topout,qmout, &
                                qmdir,knei,iroute,formt,meth,basis,     &
                                disp,chrg,mult,step,nstep,sysname,      &
                                resname,nmol,fsig,feps,fsymm,fpairs,   &
@@ -1206,6 +1239,7 @@
        character(len=leninp),intent(out)  ::  inp      !  Input file name
        character(len=leninp),intent(out)  ::  top      !  Topology file name
        character(len=leninp),intent(out)  ::  stifftop !  Stiff reference topology
+       character(len=leninp),intent(out)  ::  nbfile   ! Nonbonded topology
        character(len=leninp),intent(out)  ::  topout   !  Output topology file name
        character(len=leninp),intent(out)  ::  qmout    !  QC input file name
        character(len=leninp),intent(out)  ::  qmdir    !
@@ -1254,6 +1288,7 @@
        ref    = ''
        top    = ''
        stifftop = ''
+       nbfile = ''
        topout = ''
 !
        sysname = '[none]'
@@ -1327,6 +1362,13 @@
            case ('--reference-stiff','--stiff-topology')
              call get_command_argument(i,stifftop,status=io)
              call check_arg(stifftop,io,arg,cmd)
+             i = i + 1
+!
+           case ('--nb')
+             call get_command_argument(i,nbfile,status=io)
+             if (io/=0 .or. len_trim(nbfile)==0) &
+               error stop '--nb requires a topology file'
+             if (nbfile(1:1)=='-') error stop '--nb requires a topology file'
              i = i + 1
 !
            case ('-t','-top','--top','-topout','-outtop','--topout',   &
@@ -1560,10 +1602,9 @@
        write(*,'(2X,A)') '-f,--file                    Input file name'
        write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
                                                            'inates name'
-       write(*,'(2X,A)') '-r,--reference-coordinates   Reference '//   &
-                                                           'coordinates'
        write(*,'(2X,A)') '-p,--input-topology          Input Groma'//  &
                                                            'cs topology'
+       write(*,'(2X,A)') '--nb                        Defaults, atomtypes and atoms topology (requires QM)'
        write(*,'(2X,A)') '--reference-stiff            Use only st'//  &
                                       'iff modes from a Gromacs topology'
        write(*,'(2X,A)') '-t,--output-topology         Output Grom'//  &

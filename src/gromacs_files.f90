@@ -9,6 +9,8 @@
 !
        private
        public  ::  read_top,                                           &
+                   read_nb_top,                                        &
+                   apply_nb_top,                                       &
                    read_bond,                                          &
                    read_angle,                                         &
                    read_dihe,                                          &
@@ -149,22 +151,8 @@
 !
          call count_line(line,nstr)
 !
-         if ( nstr .eq. 6 ) then
-           read(line,*) top%attype%atname(top%attype%ntype),             &
-                        top%attype%mass(top%attype%ntype),               &
-                        top%attype%charge(top%attype%ntype),             &
-                        top%attype%ptype(top%attype%ntype),              &
-                        top%attype%sig(top%attype%ntype),                &
-                        top%attype%eps(top%attype%ntype)
-         else if ( nstr .eq. 7 ) then
-           read(line,*) top%attype%atname(top%attype%ntype),             &
-                        top%attype%bond(top%attype%ntype),               &
-                        top%attype%mass(top%attype%ntype),               &
-                        top%attype%charge(top%attype%ntype),             &
-                        top%attype%ptype(top%attype%ntype),              &
-                        top%attype%sig(top%attype%ntype),                &
-                        top%attype%eps(top%attype%ntype)
-         else
+         call parse_atomtype(line,nstr,top%attype,top%attype%ntype,io)
+         if (io/=0) then
            write(*,'(2X,68("="))')
            write(*,'(3X,A)') 'ERROR:  Invalid format in [ atomtype'//  &
                                           's ] section of topology file'
@@ -307,6 +295,182 @@
        return
        end subroutine read_top
 !
+!======================================================================!
+!
+! Common six/seven-column syntax used by both topology readers.
+       subroutine parse_atomtype(line,nstr,attype,i,io)
+       use datatypes, only: groattype
+       implicit none
+       character(len=*),intent(in) :: line
+       integer,intent(in) :: nstr,i
+       type(groattype),intent(inout) :: attype
+       integer,intent(out) :: io
+       io=1
+       if (nstr==6) then
+         read(line,*,iostat=io) attype%atname(i),attype%mass(i), &
+           attype%charge(i),attype%ptype(i),attype%sig(i),attype%eps(i)
+       else if (nstr==7) then
+         read(line,*,iostat=io) attype%atname(i),attype%bond(i), &
+           attype%mass(i),attype%charge(i),attype%ptype(i), &
+           attype%sig(i),attype%eps(i)
+       end if
+       end subroutine parse_atomtype
+
+! --nb reads only these three explicit sections, never molecular metadata,
+! connectivity, pairs or exclusions. Existing section scanning is reused.
+       subroutine read_nb_top(top,filename)
+       use datatypes, only: grotop
+       implicit none
+       type(grotop),intent(out) :: top
+       character(len=*),intent(in) :: filename
+       character(len=lenline),allocatable :: defaults(:),types(:),atoms(:)
+       character(len=lenline) :: line,fields(8)
+       integer :: unit,io,ndef,ntypes,natoms,i,j,nstr,comment
+
+       open(newunit=unit,file=filename,status='old',action='read',iostat=io)
+       if (io/=0) call nb_error(filename,'Cannot open nonbonded topology')
+       call read_top_section(unit,'[ defaults ]',defaults,ndef)
+       rewind(unit)
+       call read_top_section(unit,'[ atomtypes ]',types,ntypes)
+       rewind(unit)
+       call read_top_section(unit,'[ atoms ]',atoms,natoms)
+       close(unit)
+       if (ndef/=1) call nb_error(filename,'Expected one [ defaults ] record')
+       if (ntypes==0) call nb_error(filename,'Missing or empty [ atomtypes ]')
+       if (natoms==0) call nb_error(filename,'Missing or empty [ atoms ]')
+       read(defaults(1),*,iostat=io) top%def%nbfunc,top%def%comrule, &
+         top%def%genpair,top%def%fudgelj,top%def%fudgeqq
+       if (io/=0) call nb_error(filename,'Invalid [ defaults ] record')
+       top%nat=natoms
+       top%attype%ntype=ntypes
+       top%atom%nat=natoms
+       allocate(top%attype%atname(ntypes),top%attype%bond(ntypes), &
+         top%attype%ptype(ntypes),top%attype%atnum(ntypes), &
+         top%attype%mass(ntypes),top%attype%charge(ntypes), &
+         top%attype%sig(ntypes),top%attype%eps(ntypes))
+       allocate(top%atom%attype(natoms),top%atom%residue(natoms), &
+         top%atom%atom(natoms),top%atom%mass(natoms), &
+         top%atom%charge(natoms),top%atom%cgnr(natoms), &
+         top%atom%atnr(natoms),top%atom%resnr(natoms),top%atom%itype(natoms))
+       top%attype%atnum=0
+       top%attype%bond=''
+       do i=1,ntypes
+         line=types(i)
+         comment=index(line,';')
+         if (comment>0) line=line(:comment-1)
+         call count_line(line,nstr)
+         call parse_atomtype(line,nstr,top%attype,i,io)
+         if (io/=0) call nb_error(filename,'Invalid [ atomtypes ] record: '//trim(line))
+         read(line,*) fields(:nstr)
+         if (len_trim(fields(1))>lenlab) &
+           call nb_error(filename,'Atomtype name exceeds label length: '//trim(fields(1)))
+         if (nstr==7) then
+           if (len_trim(fields(2))>lenlab) &
+             call nb_error(filename,'Bond-type name exceeds label length: '//trim(fields(2)))
+         end if
+         if (len_trim(fields(nstr-2))/=1) &
+           call nb_error(filename,'Invalid particle type: '//trim(fields(nstr-2)))
+         do j=1,i-1
+           if (top%attype%atname(i)==top%attype%atname(j)) &
+             call nb_error(filename,'Duplicate atomtype: '//trim(top%attype%atname(i)))
+         end do
+       end do
+       do i=1,natoms
+         line=atoms(i)
+         comment=index(line,';')
+         if (comment>0) line=line(:comment-1)
+         call count_line(line,nstr)
+         if (nstr/=8) call nb_error(filename,'Expected eight [ atoms ] columns: '//trim(line))
+         read(line,*) fields
+         do j=2,5
+           if (j==3) cycle
+           if (len_trim(fields(j))>lenlab) &
+             call nb_error(filename,'[ atoms ] label exceeds length: '//trim(fields(j)))
+         end do
+         read(line,*,iostat=io) top%atom%atnr(i),top%atom%attype(i), &
+           top%atom%resnr(i),top%atom%residue(i),top%atom%atom(i), &
+           top%atom%cgnr(i),top%atom%charge(i),top%atom%mass(i)
+         if (io/=0) call nb_error(filename,'Invalid [ atoms ] record: '//trim(line))
+         if (top%atom%atnr(i)/=i) &
+           call nb_error(filename,'[ atoms ] indices must be consecutive 1..nat: '//trim(line))
+         do j=1,ntypes
+           if (top%atom%attype(i)==top%attype%atname(j)) exit
+         end do
+         if (j>ntypes) call nb_error(filename,'Undefined atomtype: '//trim(top%atom%attype(i)))
+         top%atom%itype(i)=j
+       end do
+       end subroutine read_nb_top
+
+! Apply by atom index AFTER gen_FF typing; no source type names enter idat.
+! Numeric parameters are copied in their Gromacs conventions, without unit
+! conversion (mass: u; charge: e; LJ fields follow defaults%comrule).
+       subroutine apply_nb_top(top,source,generated_type,filename,fsig,feps)
+       use datatypes, only: grotop
+       implicit none
+       type(grotop),intent(inout) :: top
+       type(grotop),intent(in) :: source
+       integer,intent(in) :: generated_type(top%nat)
+       character(len=*),intent(in) :: filename
+       real(kind=8),intent(in) :: fsig,feps
+       integer :: first(top%attype%ntype),i,j,k,t,u
+       character(len=160) :: message
+
+       if (source%nat/=top%nat) call nb_error(filename,'Atom count differs from QM system')
+       first=0
+       do i=1,top%nat
+         k=generated_type(i)
+         t=source%atom%itype(i)
+         j=first(k)
+         if (j==0) then
+           first(k)=i
+         else
+           u=source%atom%itype(j)
+! Exact comparison of input type parameters: no silent averaging, clipping
+! or parameter tolerance. Per-atom charges/masses are copied independently.
+           if (source%attype%ptype(t)/=source%attype%ptype(u)) &
+             call conflict('ptype')
+           if (source%attype%mass(t)/=source%attype%mass(u)) &
+             call conflict('mass')
+           if (source%attype%charge(t)/=source%attype%charge(u)) &
+             call conflict('charge')
+           if (source%attype%sig(t)/=source%attype%sig(u)) &
+             call conflict('sigma/LJ-V')
+           if (source%attype%eps(t)/=source%attype%eps(u)) &
+             call conflict('epsilon/LJ-W')
+         end if
+       end do
+       top%def=source%def
+       do k=1,top%attype%ntype
+         t=source%atom%itype(first(k))
+         top%attype%ptype(k)=source%attype%ptype(t)
+         top%attype%mass(k)=source%attype%mass(t)
+         top%attype%charge(k)=source%attype%charge(t)
+         top%attype%sig(k)=source%attype%sig(t)*fsig
+         top%attype%eps(k)=source%attype%eps(t)*feps
+         top%attype%atnum(k)=source%attype%atnum(t)
+       end do
+       top%atom=source%atom
+       top%atom%itype=generated_type
+       do i=1,top%nat
+         top%atom%attype(i)=top%attype%atname(generated_type(i))
+       end do
+       contains
+         subroutine conflict(parameter)
+         character(len=*),intent(in) :: parameter
+         write(message,'(A,A,A,I0,A,I0,A,A)') &
+           'Conflicting ',parameter,' for atoms ',j,' and ',i, &
+           ', generated type ',trim(top%attype%atname(k))
+         call nb_error(filename,trim(message))
+         end subroutine conflict
+       end subroutine apply_nb_top
+
+       subroutine nb_error(filename,message)
+       implicit none
+       character(len=*),intent(in) :: filename,message
+       write(*,'(A)') 'ERROR: --nb '//trim(filename)//': '//trim(message)
+       error stop 1
+       end subroutine nb_error
+
 !======================================================================!
 !
        subroutine read_top_section(unitop,key,section,nsection)
