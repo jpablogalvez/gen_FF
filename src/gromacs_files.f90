@@ -412,6 +412,14 @@
        integer,intent(in) :: generated_type(top%nat)
        character(len=*),intent(in) :: filename
        real(kind=8),intent(in) :: fsig,feps
+! Absolute input-parameter tolerances requested by the user. Compare before
+! scaling; retain the first representative without averaging accepted values.
+       real(kind=8),parameter :: mass_abs_tol_u = 1.0d-3
+       real(kind=8),parameter :: charge_abs_tol_e = 1.0d-3
+! comb-rule 2/3: V=sigma (nm), W=epsilon (kJ/mol).
+! comb-rule 1: V=C6 (kJ/mol nm**6), W=C12 (kJ/mol nm**12).
+       real(kind=8),parameter :: lj_v_abs_tol = 1.0d-3
+       real(kind=8),parameter :: lj_w_abs_tol = 1.0d-3
        integer :: first(top%attype%ntype),i,j,k,t,u
        character(len=160) :: message
 
@@ -425,17 +433,21 @@
            first(k)=i
          else
            u=source%atom%itype(j)
-! Exact comparison of input type parameters: no silent averaging, clipping
-! or parameter tolerance. Per-atom charges/masses are copied independently.
+! Per-atom charges/masses are copied independently. Only type parameters
+! share the absolute-tolerance checks below; ptype remains an exact label.
            if (source%attype%ptype(t)/=source%attype%ptype(u)) &
              call conflict('ptype')
-           if (source%attype%mass(t)/=source%attype%mass(u)) &
+           if (abs(source%attype%mass(t)-source%attype%mass(u)) &
+               >mass_abs_tol_u) &
              call conflict('mass')
-           if (source%attype%charge(t)/=source%attype%charge(u)) &
+           if (abs(source%attype%charge(t)-source%attype%charge(u)) &
+               >charge_abs_tol_e) &
              call conflict('charge')
-           if (source%attype%sig(t)/=source%attype%sig(u)) &
+           if (abs(source%attype%sig(t)-source%attype%sig(u)) &
+               >lj_v_abs_tol) &
              call conflict('sigma/LJ-V')
-           if (source%attype%eps(t)/=source%attype%eps(u)) &
+           if (abs(source%attype%eps(t)-source%attype%eps(u)) &
+               >lj_w_abs_tol) &
              call conflict('epsilon/LJ-W')
          end if
        end do
