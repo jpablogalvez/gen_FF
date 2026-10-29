@@ -1041,7 +1041,7 @@
 !
 ! Local variables
 !
-       integer                           ::  i,j   !
+       integer                           ::  i,j,orderidx !
 !
 ! Printing Gromacs dihedrals section
 ! ----------------------------------
@@ -1074,7 +1074,9 @@
        end if
 !
        if ( dihe%nflexi .gt. 0 ) then
-         do i = 1, dihe%nflexi
+         do orderidx = 1, dihe%nflexi
+           i=orderidx
+           if (allocated(dihe%flex_order)) i=dihe%flex_order(orderidx)
            do j = 1, dihe%flexi(i)%ntor
               write(uni,'(2X,5(1X,I3),2(1X,F9.4),1X,I4,5X,A,2X,I4,1X,A)')   &
                 dihe%flexi(i)%itor(:),dihe%fflexi(i),                  &

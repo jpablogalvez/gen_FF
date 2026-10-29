@@ -52,6 +52,7 @@
        logical                                         ::  fpairs   !
        logical                                         ::  fexcl    !
        logical                                         ::  debug    !
+       logical                                         :: lmethscan !
 !~        logical                                         ::  lstereo
 !
 ! File names
@@ -182,7 +183,7 @@
                          knei,iroute,formt,meth,basis,disp,chrg,mult,  &
                          step,nstep,sysname,resname,nmol,fsig,feps,    &
                          fsymm,fpairs,fexcl,fquad,fring,fhetero,       &
-                         fdouble,fnitro,fadhoc,fideal,debug)
+                         fdouble,fnitro,fadhoc,fideal,debug,lmethscan)
 !
 ! Topology-driven routes are mutually exclusive.  -p/--input-topology keeps
 ! the complete bonded functional form; --reference-stiff keeps only stiff
@@ -940,6 +941,7 @@
 !
        end if
 !
+       call prepare_methyl_scans(nat,adj,znum,dihe,lmethscan,trim(bas),trim(intop))
        fstep2 = .TRUE.
 !
 ! A Joyce Step2 input can be printed only after every relaxed-scan Gaussian
@@ -949,7 +951,8 @@
        if ( nat .ge. 4 ) then
        do i = 1, dihe%nquad
 !
-         write(cnum,'(I2.2)') i
+         if (.not.dihe%scan_active(i)) cycle
+         write(cnum,'(I2.2)') dihe%scan_id(i)
          cnum  = adjustl(cnum)
          cname = trim(bas)//'_scan-'//trim(cnum)
 !
@@ -964,6 +967,11 @@
          end if
 !
        end do
+       end if
+       if (lmethscan.and.any(dihe%methyl).and.len_trim(intop)==0) then
+         if (fstep2.and.any(dihe%scan_active)) &
+           write(*,'(A)') 'Step2 requires -p Step1/joyce.new.top to preserve methyl coefficients.'
+         fstep2=.false.
        end if
 !
 ! Symmetrizing force field terms
@@ -1007,14 +1015,14 @@
 !
        call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
                         fpairs,fsymm)
-       if ( (dihe%nflexi.gt.0) .and. fstep2 ) then
+       if ( any(dihe%scan_active) .and. fstep2 ) then
 !
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
-                          fsymm,topsrc,top%bonded,dihe,nstep)
+                          fsymm,topsrc,top%bonded,dihe,nstep,lmethscan)
 !
          call validation('Step2',dihe,meth,basis,disp,chrg,mult,resname)
 !
-       else if ( dihe%nflexi.gt.0 ) then
+       else if ( any(dihe%scan_active) ) then
 !
          write(*,*)
          write(*,'(2X,68("*"))')
@@ -1226,7 +1234,7 @@
                                disp,chrg,mult,step,nstep,sysname,      &
                                resname,nmol,fsig,feps,fsymm,fpairs,   &
                                fexcl,fquad,fring,fhetero,fdouble,      &
-                               fnitro,fadhoc,fideal,debug)
+                               fnitro,fadhoc,fideal,debug,lmethscan)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -1264,6 +1272,7 @@
        logical,intent(out)                ::  fnitro   !
        logical,intent(out)                ::  fadhoc   !
        logical,intent(out)                ::  fideal   !
+       logical,intent(out)                ::  lmethscan
 !
        character(len=20),intent(out)      ::  meth     !
        character(len=20),intent(out)      ::  basis    !
@@ -1328,6 +1337,7 @@
        fexcl  = .TRUE.
 !
        debug  = .FALSE.
+       lmethscan = .FALSE.
 !
 ! Reading command line
 !
@@ -1370,6 +1380,9 @@
                error stop '--nb requires a topology file'
              if (nbfile(1:1)=='-') error stop '--nb requires a topology file'
              i = i + 1
+!
+           case ('--no-methyl-scans')
+             lmethscan=.true.
 !
            case ('-t','-top','--top','-topout','-outtop','--topout',   &
                  '--outtop','--topology','--output-topology',          &
@@ -1599,6 +1612,7 @@
                                                  ' information and exit'
        write(*,*)
        write(*,'(A)') 'GENERAL INPUT FILES'
+       write(*,'(2X,A)') '--no-methyl-scans            Keep Step1 methyl coefficients; omit methyl scans'
        write(*,'(2X,A)') '-f,--file                    Input file name'
        write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
                                                            'inates name'
@@ -2080,7 +2094,7 @@
 ! This subroutine
 !
        subroutine print_step2(bas,top,qmout,qmdir,nstiff,fpairs,       &
-                              fsymm,intop,bonded,dihe,nstep)
+                              fsymm,intop,bonded,dihe,nstep,lmethscan)
 !
        use lengths,       only: leninp,lenline
        use units,         only: unijoyce,uniscr
@@ -2112,10 +2126,22 @@
        character(len=lenline)                    ::  line       !
        integer                                   ::  io         !
        integer                                   ::  i,j        !
+       integer :: pos,lhs,rhs,k
+       logical,intent(in) :: lmethscan
+       logical :: fixed(nstiff+dihe%ntor)
 !
 ! Generating Joyce3 input (step1)
 ! -------------------------------
 !
+       fixed=.false.
+       if (lmethscan) then
+         do i=1,dihe%nflexi
+           if (.not.dihe%methyl(i)) cycle
+           do j=1,dihe%flexi(i)%ntor
+             fixed(dihe%flexi(i)%tor(j)%stor)=.true.
+           end do
+         end do
+       end if
        qmfile = adjustl(qmout)
        qmfile = qmfile(:len_trim(qmfile)-4)//'.fchk'
 !
@@ -2152,6 +2178,15 @@
        do
          read(uniscr,'(A)',iostat=io) line
          if ( io /= 0 ) exit
+         if (lmethscan) then
+           pos=index(line,'='); k=index(line,'*')
+           if (pos>0.and.k>pos) then
+             read(line(:pos-1),*) lhs
+             read(line(pos+1:k-1),*) rhs
+             if (fixed(lhs).neqv.fixed(rhs)) error stop 'Dependency crosses fixed methyl and free torsion'
+             if (fixed(lhs)) cycle
+           end if
+         end if
          write(unijoyce,'(A)') trim(line)
        end do
 !
@@ -2197,6 +2232,16 @@
                 trim(dihe%labimpro(i))
          end do
 !
+         if (lmethscan) then
+           do i=1,dihe%nflexi
+             if (.not.dihe%methyl(i)) cycle
+             do j=1,dihe%flexi(i)%ntor
+               write(unijoyce,'(I4,1X,A,1X,ES24.16,2X,A)') &
+                 dihe%flexi(i)%tor(j)%stor,'=',dihe%flexi(i)%tor(j)%vtor, &
+                 '; '//trim(dihe%flexi(i)%tor(j)%labtor)
+             end do
+           end do
+         end if
          write(unijoyce,'(A)') '$end'
          write(unijoyce,*)
        end if
@@ -2207,7 +2252,8 @@
 !
        do i = 1, dihe%nquad
 !
-         write(cnum,'(I2.2)') i
+         if (.not.dihe%scan_active(i)) cycle
+         write(cnum,'(I2.2)') dihe%scan_id(i)
          cnum  = adjustl(cnum)
          cname = trim(qmdir)//trim(bas)//'_scan-'//trim(cnum)
 !
@@ -2230,7 +2276,8 @@
 !
        do i = 1, dihe%nquad
 !
-         write(cnum,'(I2.2)') i
+         if (.not.dihe%scan_active(i)) cycle
+         write(cnum,'(I2.2)') dihe%scan_id(i)
          cnum  = adjustl(cnum)
 !
          write(unijoyce,'(A)') '$scan '//trim(bas)//'.joyce.scan'//    &
@@ -2315,7 +2362,8 @@
          allocate(cnum(dihe%nquad),cname(dihe%nquad))
 !
          do i = 1, dihe%nquad
-           write(cnum(i),'(I2.2)') i
+           if (.not.dihe%scan_active(i)) cycle
+           write(cnum(i),'(I2.2)') dihe%scan_id(i)
            cnum(i)  = adjustl(cnum(i))
            cname(i) = 'D'//trim(cnum(i))
            write(uniout,'(A)') '[ '//trim(cname(i))//' ]'
@@ -2525,6 +2573,7 @@
        if ( dihe%nquad .gt. 0 ) then
          write(uniout,'(A)') 'scans:'
          do i = 1, dihe%nquad
+           if (.not.dihe%scan_active(i)) cycle
            write(uniout,'(A)') ACHAR(9)//                              &
              '@mkdir -p MMScans/Scan'//trim(cnum(i))
            write(uniout,'(A)') ACHAR(9)//                              &

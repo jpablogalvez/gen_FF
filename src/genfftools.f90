@@ -10,6 +10,7 @@
 !
        private
        public  ::  genrigidlist,                                       &
+                   prepare_methyl_scans,                              &
                    gencyclelist,                                       &
                    genheavylist,                                       &
                    genmethlist,                                        &
@@ -20,6 +21,100 @@
                    diedro
 !
        contains
+
+! Keep physical arrays and depquad unchanged: only traversal/scan masks differ.
+       subroutine prepare_methyl_scans(nat,adj,znum,dihe,skip,bas,reference)
+       use datatypes, only: dihedrals
+       implicit none
+       integer,intent(in) :: nat,znum(nat)
+       logical,intent(in) :: adj(nat,nat),skip
+       type(dihedrals),intent(inout) :: dihe
+       character(*),intent(in) :: bas,reference
+       integer :: i,j,k,u,io,idx,state,atoms(4),nseen,expected
+       logical :: ismet,found
+       character(256) :: manifest,line
+       allocate(dihe%methyl(dihe%nflexi),dihe%flex_order(dihe%nflexi))
+       allocate(dihe%scan_active(dihe%nquad),dihe%scan_id(dihe%nquad))
+       do i=1,dihe%nflexi
+         dihe%methyl(i)=methyl_bond(dihe%iflexi(2,i),dihe%iflexi(3,i))
+       end do
+       k=0
+       do j=1,2
+         do i=1,dihe%nflexi
+           if (dihe%methyl(i).neqv.(j==1)) cycle
+           k=k+1
+           dihe%flex_order(k)=i
+         end do
+       end do
+       do i=1,dihe%nquad
+         dihe%scan_id(i)=i
+         dihe%scan_active(i)=.not.(skip.and.methyl_bond(dihe%iquad(2,i),dihe%iquad(3,i)))
+       end do
+       if (.not.skip) return
+       if (len_trim(reference)>0) then
+         k=scan(reference,'/',back=.true.)
+         manifest=reference(:k)//trim(bas)//'_scans.tsv'
+         open(newunit=u,file=trim(manifest),status='old',iostat=io)
+         if (io/=0) error stop 'Missing Step1 scan manifest beside -p topology; regenerate with --no-methyl-scans'
+         dihe%scan_id=0
+         dihe%scan_active=.false.
+         nseen=0
+         read(u,'(A)',iostat=io) line
+         if (io/=0) error stop 'Missing scan manifest header'
+         if (index(line,'# scans ')/=1) error stop 'Invalid scan manifest header'
+         expected=-1
+         read(line(9:),*,iostat=io) expected
+         if (io/=0.or.expected<0) error stop 'Invalid scan manifest count'
+         do
+           read(u,'(A)',iostat=io) line
+           if (io<0) exit
+           if (len_trim(line)==0) cycle
+           idx=0; state=-1; atoms=0
+           read(line,*,iostat=io) idx,state,atoms
+           if (io/=0.or.idx<1.or.(state/=0.and.state/=1)) error stop 'Invalid scan manifest record'
+           if (any(dihe%scan_id==idx)) error stop 'Duplicate scan manifest index'
+           found=.false.
+           do i=1,dihe%nquad
+             if (all(dihe%iquad(:,i)==atoms).or.all(dihe%iquad([4,3,2,1],i)==atoms)) then
+               if (dihe%scan_id(i)/=0) error stop 'Duplicate scan manifest quadruplet'
+               ismet=methyl_bond(dihe%iquad(2,i),dihe%iquad(3,i))
+               if ((state==1).eqv.ismet) error stop 'Scan manifest policy mismatch'
+               dihe%scan_id(i)=idx
+               dihe%scan_active(i)=state==1
+               found=.true.
+               exit
+             end if
+           end do
+           if (.not.found) error stop 'Step1 scan quadruplet missing from reference topology'
+           nseen=nseen+1
+         end do
+         close(u)
+         if (nseen/=expected) error stop 'Incomplete Step1 scan manifest'
+         if (nseen==0.and.dihe%nquad>0) error stop 'Empty incompatible Step1 scan manifest'
+       end if
+       open(newunit=u,file=trim(bas)//'_scans.tsv',status='replace')
+       write(u,'(A,I0)') '# scans ',count(dihe%scan_id>0)
+       do i=1,dihe%nquad
+         if (dihe%scan_id(i)==0) cycle
+         write(u,'(6(I0,1X))') dihe%scan_id(i),merge(1,0,dihe%scan_active(i)),dihe%iquad(:,i)
+       end do
+       close(u)
+       contains
+       logical function methyl_bond(a,b)
+       integer,intent(in) :: a,b
+       integer :: c,d,side
+       methyl_bond=.false.
+       do side=1,2
+         c=a; d=b
+         if (side==2) then
+           c=b; d=a
+         end if
+         if (znum(c)/=6.or.count(adj(:,c))/=4) cycle
+         if (.not.adj(c,d)) cycle
+         if (count(adj(:,c).and.znum==1)==3) methyl_bond=.true.
+       end do
+       end function
+       end subroutine prepare_methyl_scans
 !
 !======================================================================!
 !
@@ -112,7 +207,7 @@
 !
        real(kind=8),parameter                      ::  pi =  4*atan(1.0_8)
        real(kind=8),parameter                      ::  thr_cc = 1.25d0
-       real(kind=8),parameter                      ::  thr_cn = 1.20d0
+       real(kind=8),parameter                      ::  thr_cn = 1.15d0
        real(kind=8),parameter                      ::  thr_nn = 1.20d0
        real(kind=8),parameter                      ::  thr_xx = 1.50d0
 

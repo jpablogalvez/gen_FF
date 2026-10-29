@@ -85,7 +85,6 @@
              if ( (dihe%squad(i).eq.1).and.(dihe%squad(j).eq.1) ) cycle
              visited(j) = .TRUE.
              qmap(j) = k
-             exit
            end if
          end do
        end do

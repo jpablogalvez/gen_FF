@@ -56,6 +56,7 @@
        integer                                          ::  iaux      !
        integer                                          ::  iterm     !
        integer                                          ::  i,j       !
+       integer                                          ::  orderidx !
 !
 ! Symmetrizing bonded terms ! TODO: option to reorder dihedral atoms
 ! -------------------------
@@ -197,7 +198,9 @@
        end do
 !
        dihed%ntor = 0
-       do i = 1, dihed%nflexi
+       do orderidx = 1, dihed%nflexi
+         i=orderidx
+         if (allocated(dihed%flex_order)) i=dihed%flex_order(orderidx)
          do j = 1, dihed%flexi(i)%ntor
            iterm = iterm + 1
            dihed%flexi(i)%tor(j)%stor = iterm
@@ -728,6 +731,8 @@
                write(unitmp,'(3X,I4,1X,A,1X,I4,A)')                    &
                                   sdihe(j),'=',sdihe(i),'*1.d0 ; '//   &
                                trim(labdihe(j))//' = '//trim(labdihe(i))
+! A later principal of the same type must not assign this target again.
+               ldep(j) = .TRUE.
              end if
            end do
          end if

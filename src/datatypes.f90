@@ -119,6 +119,8 @@
        end type flexible
 !
        type dihedrals
+         logical,allocatable :: methyl(:),scan_active(:)
+         integer,allocatable :: flex_order(:),scan_id(:)
          type(flexible),dimension(:),allocatable    ::  flexi    !
          character(len=50),dimension(:),allocatable ::  labflexi !
          character(len=50),dimension(:),allocatable ::  labrigid !
