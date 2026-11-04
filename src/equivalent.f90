@@ -1565,13 +1565,6 @@
 
              fpairs = .FALSE.
 !
-           case ('-excl','-exclusions','--exclusions')
-             fexcl = .TRUE.
-!
-           case ('-noexcl','-noexclusions','--no-exclusions',          &
-                                                       '--noexclusions')
-             fexcl = .FALSE.
-!
            case ('-v','--debug','--verbose')
              debug = .TRUE.
            case ('-h','-help','--help')
@@ -1655,7 +1648,6 @@
        write(*,*)
        write(*,'(A)') 'INTRAMOLEULAR NONBONDED INTERACTIONS'
        write(*,'(2X,A)') '-[no]pairs,--[no]intranb     Add pairs'
-       write(*,'(2X,A)') '-[no]excl,--[no]exclusions   Add exclusions'
        write(*,*)
        write(*,'(A)') 'EQUILIBRIUM VALUES'
        write(*,'(2X,A)') '-[no]sym,--[no]symmetrize    Symmetrize '//  & ! TODO: to be implemented
