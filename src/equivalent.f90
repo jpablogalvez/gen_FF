@@ -924,9 +924,9 @@
 ! Finding unique cuadruplets
 ! --------------------------
 !
-! In the pure-QM route, redundant scan representatives can be screened and
-! compacted.  When -p is supplied, the user-provided functional form must not
-! be changed by these filters.
+! Screen physical torsion terms only in the pure-QM route. With -p, preserve
+! every reference term, but still select unique scan representatives below;
+! selectquad changes scan bookkeeping, not the bonded functional form.
 !
 ! A dihedral requires four atoms. Smaller molecules keep zero counters
 ! and leave the associated arrays unallocated.
@@ -936,7 +936,7 @@
        if ( (fquad) .and. (len_trim(intop) .eq. 0) )                  &
          call screenquad(dihe,dihe%nflexi,lch3,ich3,dihe%ndihe,nat,idat)
 !
-       if ( (dihe%nquad .gt. 1) .and. (len_trim(intop) .eq. 0) )       &
+       if ( dihe%nquad .gt. 1 )                                      &
          call selectquad(nat,dihe%nquad,dihe,idat,nidat,debug)
 !
        end if
