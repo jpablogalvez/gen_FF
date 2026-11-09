@@ -787,7 +787,7 @@
        subroutine genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,    &
                               lcycle,lrigid,laroma,latar,lch3,ich3,    &
                               znum,bonded,dihed,iroute,fring,fhetero,  &
-                              fdouble,fnitro,fideal,debug)
+                              fdouble,fnitro,fideal,debug,flinear)
 !
        use datatypes, only: grobonded,                                 &
                             dihedrals
@@ -821,6 +821,7 @@
        logical,intent(in)                              ::  fnitro    !
        logical,intent(in)                              ::  fideal    !
        logical,intent(in)                              ::  debug     !  Debug mode
+       logical,intent(in)                              ::  flinear   ! Idealize near-linear valence angles
 !
 ! Local variables
 !
@@ -838,7 +839,7 @@
       if ( nat .ge. 3 ) then
         call genangles(nat,coord,bonded%nbond,bonded%ibond,adjbond,    &
                        bonded%nang,bonded%iang,bonded%ang,bonded%kang, &
-                       bonded%fang,adjang,edgeang,debug)
+                       bonded%fang,adjang,edgeang,debug,flinear)
        end if
 !
        if ( nat .ge. 4 ) then
@@ -932,7 +933,7 @@
 ! This subroutine
 !
        subroutine genangles(nat,coord,nbond,ibond,adjbond,nang,iang,   &
-                            ang,kang,fang,adjang,edgeang,debug)
+                            ang,kang,fang,adjang,edgeang,debug,flinear)
 !
        use graphtools
        use genfftools
@@ -956,12 +957,14 @@
        integer,intent(in)                                 ::  nat      !  Number of atoms
 !
        logical,intent(in)                                 ::  debug    !  Debug mode
+       logical,intent(in),optional                        ::  flinear  ! Idealize near-linear valence angles
 !
 ! Local variables
 !
        integer                                            ::  i
 !
        real(kind=8),parameter                             ::  pi =  4*atan(1.0_8)
+       real(kind=8),parameter                             ::  thr = 170.0d0
 !
 ! Generating angle-bending terms
 ! --------------------------------
@@ -995,7 +998,7 @@
                                                      coord(:,iang(3,i)))
          ang(i) = ang(i)*180.0d0/pi
 !
-         if ( ang(i) .gt. 170 ) ang(i) = 180.0d0 ! TODO: add ideal value option
+         if ( flinear .and. (ang(i).gt.thr) ) ang(i) = 180.0d0
 !
        end do
 !
@@ -1888,7 +1891,7 @@
 !
            do j = 1, dihed%flexi(i)%ntor
              dihed%flexi(i)%tor(j)%vtor  = 0.0d0
-             dihed%flexi(i)%tor(j)%phase = dihed%dflexi(i) ! TODO: shift phase for even multiplicities
+             dihed%flexi(i)%tor(j)%phase = dihed%dflexi(i) ! TODO: shift phase for even multiplicities (select value 0.0 by default)
              dihed%flexi(i)%tor(j)%multi = j-1
            end do
 !

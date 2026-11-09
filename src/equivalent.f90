@@ -28,6 +28,7 @@
        character(len=leninp)                           ::  intop    !
        character(len=leninp)                           ::  stifftop !
        character(len=leninp)                           ::  nbfile   ! Nonbonded source
+       character(len=leninp)                           ::  angfile  ! Explicit harmonic-angle source
        character(len=leninp)                           ::  topout   !
        character(len=leninp)                           ::  qmout    !
        character(len=leninp)                           ::  qmdir    !
@@ -47,6 +48,7 @@
        logical                                         ::  fnitro   !
        logical                                         ::  fadhoc   !
        logical                                         ::  fideal   !
+       logical                                         ::  flinear  ! Idealize near-linear valence angles
        logical                                         ::  fquad    !
        logical                                         ::  fsymm    !
        logical                                         ::  fpairs   !
@@ -76,6 +78,7 @@
        logical                                         ::  fstep2   !
        logical                                         ::  ftopsrc  !
        logical                                         ::  fstiffref!
+       logical                                         ::  fangles  ! Replace only the final angle list
        logical                                         ::  fnb
 !
 ! QC calculation information
@@ -129,6 +132,7 @@
         type(grotop)                                   ::  reftop   !  New topology
         type(grotop)                                   ::  top      !  New topology
         type(grotop)                                   ::  nbref    ! --nb source only
+        type(grobonded)                                ::  angref   ! --angles source only
         type(dihedrals)                                ::  dihe     !  Dihedrals
 !
 ! Atom types information
@@ -176,14 +180,12 @@
 !
 ! Reading command line options
 !
-! Parse the workflow in one place: input/output files, QM defaults, topology
-! generation switches, Joyce dependency policy, and equilibrium-value policy.
-!
        call command_line(inp,ref,intop,stifftop,nbfile,topout,qmout,qmdir, &
                          knei,iroute,formt,meth,basis,disp,chrg,mult,  &
                          step,nstep,sysname,resname,nmol,fsig,feps,    &
                          fsymm,fpairs,fexcl,fquad,fring,fhetero,       &
-                         fdouble,fnitro,fadhoc,fideal,debug,lmethscan)
+                         fdouble,fnitro,fadhoc,fideal,debug,lmethscan, &
+                         flinear,angfile)
 !
 ! Topology-driven routes are mutually exclusive.  -p/--input-topology keeps
 ! the complete bonded functional form; --reference-stiff keeps only stiff
@@ -202,6 +204,7 @@
        end if
 !
        fstiffref = len_trim(stifftop) .gt. 0
+       fangles   = len_trim(angfile) .gt. 0
        fnb       = len_trim(nbfile) .gt. 0
        ftopsrc   = (len_trim(intop) .gt. 0) .or. fstiffref
        topsrc    = intop
@@ -209,20 +212,12 @@
 !
 ! Checking qmdir definition
 !
-! qmdir is the canonical QM-data directory.  Later code assumes Gaussian/ORCA
-! outputs and generated scan inputs are addressed relative to this directory.
-!
        if ( len_trim(qmdir) .eq. 0 ) qmdir = '../QMData'
 !
 ! Check whether qmout includes a directory path
 !
-! Accept both "-qc file.log -dir QMData" and "-qc QMData/file.log" by
-! normalizing the latter into qmdir + qmout.
-!
        io = scan(qmout,'/',back=.TRUE.)
-       if ( (len_trim(qmout) .gt. 0) .and.                             &
-            (io .gt. 0) .and.                                          &
-            (io .lt. len_trim(qmout)) ) then
+       if ( (len_trim(qmout).gt.0) .and. (io.gt.0)  ) then
          qmdir = qmout(:io)
          qmout = qmout(io+1:)
        end if
@@ -231,9 +226,6 @@
        if ( qmdir(io:io) .ne. '/' ) qmdir = trim(qmdir)//'/'
 !
 ! Create qmdir if necessary
-!
-! Step0 may start from an XYZ file only.  In that route the QM-data directory
-! may not exist yet, so create it before writing OPT+FREQ input files.
 !
        inquire(file=trim(qmdir),exist=fqmdir)
 !
@@ -280,9 +272,6 @@
 !
 ! Extracting basename from input file name
 !
-! The basename is reused for all generated artefacts: topology, Joyce input,
-! Gaussian OPT+FREQ input, and relaxed scan files.
-!
        if ( SCAN(inp,'.',BACK=.TRUE.) .ne. 0 ) then
          bas = inp(:SCAN(inp,'.',BACK=.TRUE.)-1)
          ext = inp(SCAN(inp,'.',BACK=.TRUE.)+1:)
@@ -292,9 +281,6 @@
        end if
 !
 ! Cleaning basename
-!
-! Gaussian OPT+FREQ outputs are named <basename>_of.*.  If such a file is
-! supplied directly, recover the molecular basename to avoid duplicated suffixes.
 !
        if ( bas(len_trim(bas)-2:) .eq. '_of' ) then
          bas = bas(:len_trim(bas)-3)
@@ -328,9 +314,6 @@
 !
 ! Checking if QC output is present in current file
 !
-! fqmout selects the main route: without QM output only a QM input is generated;
-! with QM output the program can build a force field and Joyce inputs.
-!
        if ( len_trim(qmout) .gt. 0 ) then
 !
          INQUIRE(FILE=trim(qmdir)//trim(qmout),EXIST=fqmout)
@@ -361,10 +344,15 @@
          write(*,*)
        end if
 !
-! --nb requires QM, including when a bonded reference is also supplied.
-       if (fnb .and. .not. fqmout) then
-         write(*,'(A)') 'ERROR: --nb requires QM output; provide -qc/--qmout.'
-         error stop 1
+       if ( fnb .and. (.not.fqmout) ) then
+         write(*,*)
+         write(*,'(2X,68("="))')
+         write(*,'(3X,A)') 'ERROR:  --nb option requires QM output'
+         write(*,*)
+         write(*,'(3X,A)') 'Please, provide -qc/--qmout.'
+         write(*,'(2X,68("="))')
+         write(*,*)
+         call print_end()
        end if
 !
 ! Checking if a reference topology is provided
@@ -373,10 +361,7 @@
 !
          call read_top(reftop,itype,topsrc,uniinp)
 !
-! Nonbonded parameters copied from a reference topology can be scaled from the
-! command line.  This scaling does not change the bonded functional form.
-!
-         if (.not. fnb) then
+         if ( .not. fnb ) then
            reftop%attype%sig(:) = reftop%attype%sig(:)*fsig
            reftop%attype%eps(:) = reftop%attype%eps(:)*feps
          end if
@@ -499,8 +484,11 @@
          close(uniinp)
        end if
 !
+       if (fangles) call read_angle(angref,angfile,uniinp)
+!
 ! Keep the nonbonded source independent of all graph/typing inputs.
-       if (fnb) then
+!
+       if ( fnb ) then
          call read_nb_top(nbref,trim(nbfile))
          if (nbref%nat/=nat) then
            write(*,'(A,A,A,I0,A,I0)') 'ERROR: --nb ',trim(nbfile), &
@@ -703,9 +691,6 @@
        call gentypes(nat,eqv,lab,newlab,ilab,nlab,eqlab,idat,nidat,    &
                      debug)
 !
-! Stereo refinement temporarily disabled pending careful bug diagnosis.
-! Keep the implementation available; use only the topological types above.
-!
 !~        if ( fqmout ) then
 !~          call refine_stereotypes(nat,adj,lrigid,laroma,coord,idat,     &
 !~                                  eqv,lstereo,debug)
@@ -727,7 +712,6 @@
                 top%atom%itype(nat))
 !
 ! If input topology is specified take information from there
-!  (command line options have priority)
 !
        if ( ftopsrc ) then
 !
@@ -849,7 +833,7 @@
 ! Force Field generation
 ! ----------------------
 !
-       if ( (fqmout) .and. (len_trim(intop) .eq. 0) ) then
+       if ( fqmout .and. (len_trim(intop) .eq. 0) ) then
 !
 ! Pure-QM route: infer the full bonded functional form from the QM-derived
 ! graph, Wiberg matrix, geometry, ring information and atom types.
@@ -857,7 +841,7 @@
          call genffbonded(nat,idat,nidat,coord,wiberg,adj,ideg,        &
                           lcycle,lrigid,laroma,latar,lch3,ich3,znum,   &
                           top%bonded,dihe,iroute,fring,fhetero,        &
-                          fdouble,fnitro,fideal,debug)
+                          fdouble,fnitro,fideal,debug,flinear)
 !
          if ( fstiffref ) then
 !
@@ -931,7 +915,7 @@
 ! A dihedral requires four atoms. Smaller molecules keep zero counters
 ! and leave the associated arrays unallocated.
 !
-       if ( nat .ge. 4 ) then
+       if ( nat .ge. 4 ) then ! TODO: enter here only if nflexi .gt. 0
 !
        if ( (fquad) .and. (len_trim(intop) .eq. 0) )                  &
          call screenquad(dihe,dihe%nflexi,lch3,ich3,dihe%ndihe,nat,idat)
@@ -974,6 +958,16 @@
          fstep2=.false.
        end if
 !
+! Apply the angle-only override after all graph, torsion and scan decisions.
+!
+       if ( fangles ) then
+         top%bonded%nang = angref%nang
+         top%bonded%iang = angref%iang
+         top%bonded%fang = angref%fang
+         top%bonded%ang  = angref%ang
+         top%bonded%kang = angref%kang
+       end if
+!
 ! Symmetrizing force field terms
 ! ------------------------------
 !
@@ -991,6 +985,12 @@
                         marunit,narunit,arunit,lheavy,adj,fsymm,       &
                         fadhoc,debug)
 
+! Preserve imported equilibrium values and index order exactly in memory.
+! Leave existing symmetry/dependency handling for all other terms untouched.
+       if ( fangles ) then
+         top%bonded%ang  = angref%ang
+         top%bonded%iang = angref%iang
+       end if
 !
        write(unideps,'(A)') '$end'
 !
@@ -1234,7 +1234,8 @@
                                disp,chrg,mult,step,nstep,sysname,      &
                                resname,nmol,fsig,feps,fsymm,fpairs,   &
                                fexcl,fquad,fring,fhetero,fdouble,      &
-                               fnitro,fadhoc,fideal,debug,lmethscan)
+                               fnitro,fadhoc,fideal,debug,lmethscan, &
+                               flinear,angfile)
 !
        use lengths, only: leninp,lencmd,lenarg,lentag,lenlab
        use printings
@@ -1248,6 +1249,7 @@
        character(len=leninp),intent(out)  ::  top      !  Topology file name
        character(len=leninp),intent(out)  ::  stifftop !  Stiff reference topology
        character(len=leninp),intent(out)  ::  nbfile   ! Nonbonded topology
+       character(len=leninp),intent(out)  ::  angfile  ! Harmonic-angle topology
        character(len=leninp),intent(out)  ::  topout   !  Output topology file name
        character(len=leninp),intent(out)  ::  qmout    !  QC input file name
        character(len=leninp),intent(out)  ::  qmdir    !
@@ -1272,6 +1274,7 @@
        logical,intent(out)                ::  fnitro   !
        logical,intent(out)                ::  fadhoc   !
        logical,intent(out)                ::  fideal   !
+       logical,intent(out)                ::  flinear  ! Near-linear valence-angle policy
        logical,intent(out)                ::  lmethscan
 !
        character(len=20),intent(out)      ::  meth     !
@@ -1298,6 +1301,7 @@
        top    = ''
        stifftop = ''
        nbfile = ''
+       angfile = ''
        topout = ''
 !
        sysname = '[none]'
@@ -1315,6 +1319,7 @@
 !
        fadhoc  = .FALSE.
        fideal  = .FALSE.
+       flinear = .FALSE.
 !
        formt  = 'g16'
        step  = 15.0
@@ -1372,6 +1377,12 @@
            case ('--reference-stiff','--stiff-topology')
              call get_command_argument(i,stifftop,status=io)
              call check_arg(stifftop,io,arg,cmd)
+             i = i + 1
+!
+           case ('--angles')
+             call get_command_argument(i,angfile,status=io)
+             if (io/=0.or.len_trim(angfile)==0) error stop '--angles requires a topology file'
+             if (angfile(1:1)=='-') error stop '--angles requires a topology file'
              i = i + 1
 !
            case ('--nb')
@@ -1543,6 +1554,12 @@
                  '--geometric-equilibrium')
              fideal = .FALSE.
 !
+           case ('--linear-ideal')
+             flinear = .TRUE.
+!
+           case ('--linear-noideal')
+             flinear = .FALSE.
+!
            case ('-pquad','-principal-quad','--principal-quad',        &
                                 '--principal-quadruplets','--principal')
              fquad = .TRUE.
@@ -1605,7 +1622,6 @@
                                                  ' information and exit'
        write(*,*)
        write(*,'(A)') 'GENERAL INPUT FILES'
-       write(*,'(2X,A)') '--no-methyl-scans            Keep Step1 methyl coefficients; omit methyl scans'
        write(*,'(2X,A)') '-f,--file                    Input file name'
        write(*,'(2X,A)') '-c,--coordinates             Input coord'//  &
                                                            'inates name'
@@ -1631,6 +1647,8 @@
        write(*,'(2X,A)') '-knei,--knei                 K-nearest neighbor'
        write(*,*)
        write(*,'(A)') 'FUNCTIONAL FORM OF THE FF'
+       write(*,'(2X,A)') '--angles                     Read [ angles ] section from external topology'
+       write(*,'(2X,A)') '--no-methyl-scans            Keep Step1 methyl coefficients; omit methyl scans'
        write(*,'(2X,A)') '-[no]pquad,--[no]principal   Include onl'//  &
                                                'y principal quadruplets'
        write(*,'(2X,A)') '--[no]star-ring              Add star li'//  &
@@ -1654,6 +1672,7 @@
                                                        'output topology'
        write(*,'(2X,A)') '-[no]ideal,--[no]idealval    Use ideal e'//  &
                                                      'quilibrium values'
+       write(*,'(2X,A)') '--linear-[no]ideal           Set generated valence angles >170 deg to 180 deg'
        write(*,*)
        write(*,'(A)') 'NONBONDED INTERACTIONS MANIPULATION'
        write(*,'(2X,A)') '-fsig,--factor-sigma         Scale sigma'//  &
