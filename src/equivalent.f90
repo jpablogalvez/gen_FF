@@ -169,7 +169,7 @@
 ! Initializing line lengths
 !
        lin  = 35
-       lfin = 70
+       lfin = 90
 !
 ! Initializing timings
 !
@@ -2577,6 +2577,9 @@
                                                       'joyce_QMmin.fchk'
        write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
          'rm structure.fchk gradients.fchk hessian.fchk'
+       write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
+         'calcRMS_bonded -f joyce.g0_min.xyz '//                       &
+                        '-r ../../../'//step//'/joyce.g0.xyz'
        write(uniout,'(A)') 
 !
 ! Printing dihedral scan block
@@ -2615,7 +2618,7 @@
          'printf "'//trim(resname)//' Other\n" > residuetypes.dat'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
          'grompp -f vacuum.mdp -c ../OPTFREQ/joyce.g0_min.g96 '//      &
-         '-p ../../Step1/joyce.new.top -o md.tpr'
+         '-p ../../'//step//'/joyce.new.top -o md.tpr'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
          'mdrun -deffnm md'
        write(uniout,'(A)') ACHAR(9)//'@cd Virial; '//                  &
