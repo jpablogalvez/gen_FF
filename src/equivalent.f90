@@ -2170,7 +2170,7 @@
 !~        write(unijoyce,'(A)') '$gracetors        '//trim(bas)//         &
 !~                                                           '_torschk.agr'
        write(unijoyce,'(A)') '$gracefreq  joyce.freqchk.agr'
-       write(unijoyce,'(A)') '$gracetors        torschk.agr'
+       write(unijoyce,'(A)') '$gracetors        torschk'
        write(unijoyce,*)
 !~        if ( fsymm ) then
          write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+dihe%ntor
