@@ -1891,7 +1891,8 @@
 !
            do j = 1, dihed%flexi(i)%ntor
              dihed%flexi(i)%tor(j)%vtor  = 0.0d0
-             dihed%flexi(i)%tor(j)%phase = dihed%dflexi(i) ! TODO: shift phase for even multiplicities (select value 0.0 by default)
+!~              dihed%flexi(i)%tor(j)%phase = dihed%dflexi(i) ! TODO: shift phase for even multiplicities (select value 0.0 by default)
+             dihed%flexi(i)%tor(j)%phase = 0.d0 ! TODO: shift phase for even multiplicities (select value 0.0 by default)
              dihed%flexi(i)%tor(j)%multi = j-1
            end do
 !

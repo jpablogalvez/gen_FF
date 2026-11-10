@@ -1078,7 +1078,7 @@
            i=orderidx
            if (allocated(dihe%flex_order)) i=dihe%flex_order(orderidx)
            do j = 1, dihe%flexi(i)%ntor
-              write(uni,'(2X,5(1X,I3),2(1X,F9.4),1X,I4,5X,A,2X,I4,1X,A)')   &
+              write(uni,'(2X,5(1X,I3),2(1X,F14.4),1X,I4,5X,A,2X,I4,1X,A)')   &
                 dihe%flexi(i)%itor(:),dihe%fflexi(i),                  &
                 dihe%flexi(i)%tor(j)%phase,dihe%flexi(i)%tor(j)%vtor,  &
                 dihe%flexi(i)%tor(j)%multi,';',dihe%flexi(i)%tor(j)%stor,trim(dihe%flexi(i)%tor(j)%labtor)
