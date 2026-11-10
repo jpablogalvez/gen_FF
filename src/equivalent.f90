@@ -1014,7 +1014,7 @@
 ! torsions exist and all scan outputs are available.
 !
        call print_step1(bas,topout,qmout,qmdir,reftop%nstiff,          &
-                        fpairs,fsymm)
+                        fpairs,fsymm,dihe%ntor)
        if ( any(dihe%scan_active) .and. fstep2 ) then
 !
          call print_step2(bas,topout,qmout,qmdir,reftop%nstiff,fpairs, &
@@ -2031,7 +2031,7 @@
 !
 ! This subroutine
 !
-       subroutine print_step1(bas,top,qmout,qmdir,nstiff,fpairs,fsymm)
+       subroutine print_step1(bas,top,qmout,qmdir,nstiff,fpairs,fsymm,ntor)
 !
        use lengths,  only: leninp,lenline
        use units,    only: unijoyce,unitmp
@@ -2045,6 +2045,7 @@
        character(len=leninp),intent(in)          ::  qmout   !
        character(len=leninp),intent(in)          ::  qmdir   !
        integer,intent(in)                        ::  nstiff  !
+       integer,intent(in)                        ::  ntor    !
        logical,intent(in)                        ::  fpairs  !
        logical,intent(in)                        ::  fsymm   !
 !
@@ -2076,7 +2077,7 @@
        write(unijoyce,*)
 !~        if ( fsymm ) write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
 !~        if ( fsymm ) write(unijoyce,*)
-       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff
+       write(unijoyce,'(A,I4)') '$keepff 1 - ',nstiff+ntor
        write(unijoyce,*)
        write(unijoyce,'(A)') '$dependence 1.2'
 !
