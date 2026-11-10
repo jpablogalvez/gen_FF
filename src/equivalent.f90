@@ -2579,7 +2579,7 @@
          'rm structure.fchk gradients.fchk hessian.fchk'
        write(uniout,'(A)') ACHAR(9)//'@cd OPTFREQ; '//                 &
          'calcRMS_bonded -f joyce.g0_min.xyz '//                       &
-                        '-r ../../../'//step//'/joyce.g0.xyz'
+                        '-r ../../'//step//'/joyce.g0.xyz > RMSD.out'
        write(uniout,'(A)') 
 !
 ! Printing dihedral scan block
