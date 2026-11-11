@@ -142,7 +142,8 @@
        integer,dimension(:),allocatable                ::  ilab     !  Integers associated to initial labels
        integer,dimension(:),allocatable                ::  eqlab    !  Integers associated to equivalent nuclei
        integer,dimension(:),allocatable                ::  idat     !  Integers associated to refined labels
-       integer,dimension(:),allocatable                ::  itype    !  Integer associated to atomtypes
+       integer,dimension(:),allocatable                ::  refitype !  Atom -> reference atomtypes row
+       integer,dimension(:),allocatable                ::  itype    !  Atom -> generated atomtypes row
        integer                                         ::  nlab     !  Number of initial labels
        integer                                         ::  nidat    !  Number of refined labels
 !
@@ -359,7 +360,7 @@
 !
        if ( ftopsrc ) then
 !
-         call read_top(reftop,itype,topsrc,uniinp)
+         call read_top(reftop,refitype,topsrc,uniinp)
 !
          if ( .not. fnb ) then
            reftop%attype%sig(:) = reftop%attype%sig(:)*fsig
@@ -653,14 +654,7 @@
 ! Start from element/input-label partitions.  The atom-typing algorithm below
 ! refines these labels into final force-field atom types.
 !
-!~        if ( len_trim(intop) .eq. 0 )  then
-         call strnormlabels(nat,lab,ilab,nlab)
-         if (.NOT.allocated(itype)) allocate(itype(nat))
-         itype(:) = ilab(:)
-!~        else
-!~          ilab(:) = itype(:)
-!~          nlab    = reftop%attype%ntype
-!~        end if
+       call strnormlabels(nat,lab,ilab,nlab)
 !
 ! Atom typing strategy
 ! --------------------
@@ -760,7 +754,10 @@
 !
 ! Build [ atomtypes ] from the refined labels.  With a reference topology,
 ! nonbonded parameters are copied from each atom's original reference type.
+! ilab labels the initial partition; refitype and itype index different
+! atomtypes tables and must never be used interchangeably.
 !
+       allocate(itype(nat))
        top%attype%ntype     = nidat
        top%attype%ptype(:)  = 'A'
        top%attype%mass(:)   = 0.0d0
@@ -775,7 +772,7 @@
          do j = 1, k
            if ( newlab(i) .eq. top%attype%atname(j) ) then
              match = .TRUE.
-             top%atom%itype(i) = j
+             itype(i) = j
              exit
            end if
          end do
@@ -783,24 +780,22 @@
 !
            k = k + 1
 !
-           top%atom%itype(i) = k
+           itype(i) = k
 !
            top%attype%atname(k) = newlab(i)
            top%attype%bond(k)   = newlab(i)
 !
            if ( ftopsrc ) then
-             top%attype%ptype(k)  = reftop%attype%ptype(itype(i))
-             top%attype%mass(k)   = reftop%attype%mass(itype(i))
-             top%attype%charge(k) = reftop%attype%charge(itype(i))
-             top%attype%sig(k)    = reftop%attype%sig(itype(i))
-             top%attype%eps(k)    = reftop%attype%eps(itype(i))
-             top%attype%atnum(k)  = reftop%attype%atnum(itype(i))
+             top%attype%ptype(k)  = reftop%attype%ptype(refitype(i))
+             top%attype%mass(k)   = reftop%attype%mass(refitype(i))
+             top%attype%charge(k) = reftop%attype%charge(refitype(i))
+             top%attype%sig(k)    = reftop%attype%sig(refitype(i))
+             top%attype%eps(k)    = reftop%attype%eps(refitype(i))
+             top%attype%atnum(k)  = reftop%attype%atnum(refitype(i))
            end if
 !
          end if
        end do
-!
-       itype(:) = top%atom%itype(:)
 !
 ! Generating new atoms section
 !
@@ -825,6 +820,8 @@
        end if
 !
        top%atom%attype(:) = newlab(:)
+! Copying reference metadata above must not restore reference type indices.
+       top%atom%itype(:) = itype(:)
 !
 ! --nb overrides only defaults, atom-type parameters and per-atom records.
 ! The generated type map and all bonded/reference data remain independent.
@@ -1146,6 +1143,7 @@
 !
        if ( ftopsrc ) then
 !
+         deallocate(refitype)
          deallocate(reftop%attype%atname,reftop%attype%bond,           &
                     reftop%attype%ptype,reftop%attype%atnum,           &
                     reftop%attype%mass,reftop%attype%charge,           &
